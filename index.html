@@ -645,20 +645,20 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
           <div class="qa-icon">🏢</div><span>조직도</span>
         </div>
       </div>
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header"><h3>📢 최근 공지사항</h3><button class="btn btn-sm btn-outline" onclick="showPage('notice',null)">전체보기</button></div>
+        <div class="card-body" id="dashNoticeList"></div>
+      </div>
       <div class="stats-grid" id="statsGrid"></div>
       <div class="grid-2">
         <div class="card">
-          <div class="card-header"><h3>📥 결재 대기 문서</h3><button class="btn btn-sm btn-outline" onclick="showPage('approvalBox',null)">전체보기</button></div>
+          <div class="card-header"><h3>📥 결재 대기 문서</h3><button class="btn btn-sm btn-outline" onclick="gotoApprovalTab('pending')">전체보기</button></div>
           <div class="card-body" id="dashPendingList"></div>
         </div>
         <div class="card">
-          <div class="card-header"><h3>📋 최근 기안 문서</h3><button class="btn btn-sm btn-outline" onclick="showPage('myDocs',null)">전체보기</button></div>
+          <div class="card-header"><h3>📋 최근 기안 문서</h3><button class="btn btn-sm btn-outline" onclick="gotoMyDocsTab('all')">전체보기</button></div>
           <div class="card-body" id="dashMyList"></div>
         </div>
-      </div>
-      <div class="card" style="margin-top:20px">
-        <div class="card-header"><h3>📢 최근 공지사항</h3><button class="btn btn-sm btn-outline" onclick="showPage('notice',null)">전체보기</button></div>
-        <div class="card-body" id="dashNoticeList"></div>
       </div>
     </div>
 
@@ -1966,10 +1966,10 @@ function loadDashboard() {
   const total = DB.docs.filter(d=>!d.draft).length;
 
   document.getElementById('statsGrid').innerHTML = `
-    <div class="stat-card"><div class="stat-icon" style="background:#e3f0fb">📋</div><div class="stat-info"><div class="num">${total}</div><div class="label">전체 문서</div></div></div>
-    <div class="stat-card"><div class="stat-icon" style="background:#fff3cd">⏳</div><div class="stat-info"><div class="num">${pending.length}</div><div class="label">결재 대기</div></div></div>
-    <div class="stat-card"><div class="stat-icon" style="background:#d4edda">✅</div><div class="stat-info"><div class="num">${approved.length}</div><div class="label">결재 완료</div></div></div>
-    <div class="stat-card"><div class="stat-icon" style="background:#f0e6ff">📝</div><div class="stat-info"><div class="num">${myDocs.length}</div><div class="label">내 기안 문서</div></div></div>
+    <div class="stat-card" style="cursor:pointer" onclick="gotoMyDocsTab('all')" title="내 문서 전체 보기"><div class="stat-icon" style="background:#e3f0fb">📋</div><div class="stat-info"><div class="num">${total}</div><div class="label">전체 문서</div></div></div>
+    <div class="stat-card" style="cursor:pointer" onclick="gotoApprovalTab('pending')" title="결재 대기 보기"><div class="stat-icon" style="background:#fff3cd">⏳</div><div class="stat-info"><div class="num">${pending.length}</div><div class="label">결재 대기</div></div></div>
+    <div class="stat-card" style="cursor:pointer" onclick="gotoApprovalTab('done')" title="결재 완료 보기"><div class="stat-icon" style="background:#d4edda">✅</div><div class="stat-info"><div class="num">${approved.length}</div><div class="label">결재 완료</div></div></div>
+    <div class="stat-card" style="cursor:pointer" onclick="gotoMyDocsTab('all')" title="내 기안 문서 보기"><div class="stat-icon" style="background:#f0e6ff">📝</div><div class="stat-info"><div class="num">${myDocs.length}</div><div class="label">내 기안 문서</div></div></div>
   `;
 
   // Pending list
@@ -2367,18 +2367,25 @@ function submitDoc() {
   }));
 
   if (editingDocId) {
-    // 수정 모드: 기존 임시저장 문서를 제출로 변환
+    // 수정 모드: 기존 문서 업데이트
     const doc = DB.docs.find(d=>d.id===editingDocId);
     if (doc) {
+      const wasNonDraft = doc.status !== 'draft'; // 관리자가 제출된 문서 수정 시
       doc.title=title; doc.type=document.getElementById('docType').value;
       doc.urgency=document.getElementById('docUrgency').value;
       doc.retention=document.getElementById('docRetention').value;
-      doc.content=content; doc.approvers=approvers;
-      doc.status='pending'; doc.draft=false;
-      doc.date=new Date().toLocaleDateString('ko-KR').replaceAll('. ','-').replace('.','');
+      doc.content=content;
+      if (!wasNonDraft || !approvers.length) {
+        // 임시저장 → 제출, 또는 결재라인 변경 시 pending으로 전환
+        doc.approvers=approvers; doc.status='pending'; doc.draft=false;
+        doc.date=new Date().toLocaleDateString('ko-KR').replaceAll('. ','-').replace('.','');
+        showNewDocNotif(title, currentUser.name, currentUser.dept);
+      } else {
+        // 관리자가 진행중/완료 문서 수정: 기존 결재라인/상태 유지
+        doc.approvers=approvers;
+      }
       sbSave('docs', doc.id, doc);
-      showToast(`"${title}" 문서가 수정 제출되었습니다! 📤`,'success');
-      showNewDocNotif(title, currentUser.name, currentUser.dept);
+      showToast(`"${title}" 문서가 수정되었습니다! ✅`,'success');
     }
     editingDocId=null; _setWriteDocHeader(false);
   } else {
@@ -2446,7 +2453,10 @@ function renderMyDocs(filter) {
 
 function editDoc(docId) {
   const doc = DB.docs.find(d=>d.id===docId);
-  if (!doc || doc.status!=='draft') return;
+  if (!doc) return;
+  // 관리자는 모든 문서 수정 가능, 일반 사용자는 본인의 draft만
+  const isAdmin = currentUser && currentUser.role === 'admin';
+  if (!isAdmin && (doc.writer !== currentUser.id || doc.status !== 'draft')) return;
   editingDocId = docId;
   // 폼에 기존 데이터 로드
   document.getElementById('docTitle').value = doc.title;
@@ -2468,8 +2478,33 @@ function deleteDoc(id) {
   const i = DB.docs.findIndex(d=>d.id===id);
   if (i>-1) DB.docs.splice(i,1);
   sbRemove('docs', id);
+  closeModal('docViewModal');
   renderMyDocs(currentDocFilter);
   showToast('문서가 삭제되었습니다.','success');
+}
+
+// ============================================================
+// 대시보드 통계카드 탭 이동 헬퍼
+// ============================================================
+function gotoApprovalTab(filter) {
+  showPage('approvalBox', null);
+  approvalFilter = filter;
+  const tabs = document.querySelectorAll('#page-approvalBox .tab');
+  const idx = { pending:0, waiting:1, done:2 }[filter] || 0;
+  tabs.forEach(t => t.classList.remove('active'));
+  if (tabs[idx]) tabs[idx].classList.add('active');
+  renderApprovalBox(filter);
+}
+
+function gotoMyDocsTab(filter) {
+  showPage('myDocs', null);
+  currentDocFilter = filter;
+  const tabs = document.querySelectorAll('#page-myDocs .tab');
+  const filterOrder = ['all','draft','pending','approved','rejected'];
+  const idx = filterOrder.indexOf(filter);
+  tabs.forEach(t => t.classList.remove('active'));
+  if (idx >= 0 && tabs[idx]) tabs[idx].classList.add('active');
+  renderMyDocs(filter);
 }
 
 // ============================================================
@@ -2616,11 +2651,12 @@ function viewDoc(docId) {
     `;
   } else {
     const isWriter = doc.writer === currentUser.id;
+    const isAdmin  = currentUser.role === 'admin';
     footer.innerHTML = `
       <button class="btn btn-secondary" onclick="closeModal('docViewModal')">닫기</button>
-      ${currentUser.role==='admin'?`<button class="btn btn-outline" onclick="openAdminDocEdit('${doc.id}')">🔧 문서정보 수정</button>`:''}
-      ${isWriter&&doc.status==='draft'?`<button class="btn btn-primary" onclick="editDoc('${doc.id}')">✏️ 수정</button>`:''}
-      ${isWriter&&doc.status==='draft'?`<button class="btn btn-danger" onclick="closeModal('docViewModal');deleteDoc('${doc.id}')">🗑️ 삭제</button>`:''}
+      ${isAdmin?`<button class="btn btn-outline" onclick="openAdminDocEdit('${doc.id}')">🔧 메타정보 수정</button>`:''}
+      ${(isWriter&&doc.status==='draft')||isAdmin?`<button class="btn btn-primary" onclick="editDoc('${doc.id}')">✏️ 내용 수정</button>`:''}
+      ${(isWriter&&doc.status==='draft')||isAdmin?`<button class="btn btn-danger" onclick="deleteDoc('${doc.id}')">🗑️ 삭제</button>`:''}
       ${doc.status==='approved'||doc.status==='rejected'?`<button class="btn btn-primary" style="background:#1a3a5c" onclick="closeModal('docViewModal');printDoc('${doc.id}')">🖨️ 프린트 출력</button>`:''}
     `;
   }
