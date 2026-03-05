@@ -1578,17 +1578,24 @@ function sbId(type, itemId) {
   return String(itemId); // docs, templates
 }
 
+// 자신이 발생시킨 변경 추적 (실시간 이벤트 중복 처리 방지)
+const _localChanges = new Set();
+
 // Supabase 저장 (upsert)
 function sbSave(type, itemId, data) {
+  const rid = sbId(type, itemId);
+  _localChanges.add(rid);
   sb.from('online_items').upsert({
-    id: sbId(type, itemId), type, data,
+    id: rid, type, data,
     updated_at: new Date().toISOString()
   }).then(({error}) => { if (error) console.error('Supabase 저장 오류:', error); });
 }
 
 // Supabase 삭제
 function sbRemove(type, itemId) {
-  sb.from('online_items').delete().eq('id', sbId(type, itemId))
+  const rid = sbId(type, itemId);
+  _localChanges.add(rid);
+  sb.from('online_items').delete().eq('id', rid)
     .then(({error}) => { if (error) console.error('Supabase 삭제 오류:', error); });
 }
 
@@ -1628,6 +1635,93 @@ async function seedSupabase() {
   ];
   const {error} = await sb.from('online_items').upsert(items);
   if (error) console.error('Supabase 시드 오류:', error);
+}
+
+// ============================================================
+// SUPABASE REALTIME 실시간 구독
+// ============================================================
+let _realtimeChannel = null;
+
+function initRealtime() {
+  if (_realtimeChannel) sb.removeChannel(_realtimeChannel);
+  _realtimeChannel = sb.channel('online_items_rt')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'online_items' }, handleRealtimeChange)
+    .subscribe(status => {
+      if (status === 'SUBSCRIBED') console.log('Supabase 실시간 연결됨');
+    });
+}
+
+function handleRealtimeChange(payload) {
+  if (!currentUser) return;
+  const { eventType, new: newRec, old: oldRec } = payload;
+
+  if (eventType === 'INSERT' || eventType === 'UPDATE') {
+    const rid = newRec.id;
+    // 자신의 변경은 이미 in-memory에 반영됨 → 건너뜀
+    if (_localChanges.has(rid)) { _localChanges.delete(rid); return; }
+    applyDBChange(newRec.type, newRec.data);
+    // 다른 사용자의 새 문서 알림
+    if (eventType === 'INSERT' && newRec.type === 'docs' && newRec.data.writer !== currentUser.id && !newRec.data.draft) {
+      showNewDocNotif(newRec.data.title, getUser(newRec.data.writer).name, newRec.data.dept);
+    }
+    // 다른 사용자의 새 공지 알림
+    if (eventType === 'INSERT' && newRec.type === 'notices' && newRec.data.author !== currentUser.id) {
+      showToast(`새 공지사항: "${newRec.data.title}"`, 'info');
+    }
+  } else if (eventType === 'DELETE') {
+    const rid = oldRec.id;
+    if (_localChanges.has(rid)) { _localChanges.delete(rid); return; }
+    applyDBDelete(rid);
+  }
+
+  refreshCurrentPage();
+}
+
+function applyDBChange(type, data) {
+  if (type === 'docs') {
+    const idx = DB.docs.findIndex(d => d.id === data.id);
+    if (idx > -1) DB.docs[idx] = data; else DB.docs.push(data);
+  } else if (type === 'users') {
+    const idx = DB.users.findIndex(u => u.id === data.id);
+    if (idx > -1) DB.users[idx] = data; else DB.users.push(data);
+    if (currentUser && currentUser.id === data.id) Object.assign(currentUser, data);
+  } else if (type === 'notices') {
+    const idx = DB.notices.findIndex(n => n.id === data.id);
+    if (idx > -1) DB.notices[idx] = data; else DB.notices.push(data);
+  } else if (type === 'lines') {
+    const idx = DB.lines.findIndex(l => l.id === data.id);
+    if (idx > -1) DB.lines[idx] = data; else DB.lines.push(data);
+  } else if (type === 'depts') {
+    const idx = DB.depts.findIndex(d => d.name === data.name);
+    if (idx > -1) DB.depts[idx] = data; else DB.depts.push(data);
+  } else if (type === 'templates') {
+    const idx = DB.templates.findIndex(t => t.id === data.id);
+    if (idx > -1) DB.templates[idx] = data; else DB.templates.push(data);
+  }
+}
+
+function applyDBDelete(rowId) {
+  if (rowId.startsWith('user-'))    DB.users     = DB.users.filter(u => 'user-'+u.id !== rowId);
+  else if (rowId.startsWith('notice-')) DB.notices = DB.notices.filter(n => 'notice-'+n.id !== rowId);
+  else if (rowId.startsWith('line-'))   DB.lines   = DB.lines.filter(l => 'line-'+l.id !== rowId);
+  else if (rowId.startsWith('dept-'))   DB.depts   = DB.depts.filter(d => 'dept-'+d.name !== rowId);
+  else if (rowId.startsWith('TPL-'))    DB.templates = DB.templates.filter(t => t.id !== rowId);
+  else DB.docs = DB.docs.filter(d => d.id !== rowId); // docs
+}
+
+function refreshCurrentPage() {
+  const active = document.querySelector('.page.active');
+  if (!active) return;
+  const name = active.id.replace('page-', '');
+  if (name === 'dashboard')    loadDashboard();
+  else if (name === 'myDocs')       renderMyDocs(currentDocFilter || 'all');
+  else if (name === 'approvalBox')  renderApprovalBox(approvalFilter || 'pending');
+  else if (name === 'approvalLine') loadLines();
+  else if (name === 'notice')       loadNotice();
+  else if (name === 'orgChart')     loadOrgChart();
+  else if (name === 'members')      renderMembers('');
+  else if (name === 'templates')    loadTemplates();
+  updateBadge();
 }
 
 // ============================================================
@@ -1723,10 +1817,12 @@ async function doLogin() {
   loadSettings();
   showPage('dashboard', null);
   updateBadge();
+  initRealtime();
   showToast(`${user.name}님, 환영합니다! 👋`, 'success');
 }
 
 function doLogout() {
+  if (_realtimeChannel) { sb.removeChannel(_realtimeChannel); _realtimeChannel = null; }
   currentUser = null;
   document.getElementById('appPage').style.display = 'none';
   document.getElementById('loginPage').style.display = 'flex';
