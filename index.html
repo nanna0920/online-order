@@ -164,14 +164,16 @@ tbody tr:last-child td { border-bottom:none; }
 .badge-draft { background:#e9ecef; color:#495057; }
 .badge-notice { background:rgba(26,58,92,0.1); color:var(--primary); }
 
-/* 신규 문서 알림 팝업 */
-#newDocNotif {
-  display:none; position:fixed; top:20px; right:24px; z-index:9999;
-  background:#fff; border:2px solid var(--primary); border-radius:12px;
+/* 알림 팝업 공통 */
+#newDocNotif, #approvalReqNotif {
+  display:none; position:fixed; right:24px; z-index:9999;
+  background:#fff; border-radius:12px;
   box-shadow:0 8px 32px rgba(26,58,92,.18); padding:16px 20px;
   min-width:280px; max-width:340px; animation:slideInRight .35s ease;
 }
-#newDocNotif.show { display:flex; align-items:flex-start; gap:12px; }
+#newDocNotif { top:20px; border:2px solid var(--primary); }
+#approvalReqNotif { top:185px; border:2px solid var(--accent); }
+#newDocNotif.show, #approvalReqNotif.show { display:flex; align-items:flex-start; gap:12px; }
 @keyframes slideInRight {
   from { transform:translateX(120%); opacity:0; }
   to   { transform:translateX(0);    opacity:1; }
@@ -826,6 +828,7 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
       </div>
       <div class="tabs">
         <button class="tab active" onclick="filterApproval('pending',this)">결재 대기 <span id="pendingCnt" class="chip" style="margin-left:4px">0</span></button>
+        <button class="tab" onclick="filterApproval('waiting',this)">결재 예정 <span id="waitingCnt" class="chip" style="margin-left:4px;background:rgba(200,151,58,0.15);color:var(--accent)">0</span></button>
         <button class="tab" onclick="filterApproval('done',this)">처리 완료</button>
       </div>
       <div class="card">
@@ -1143,6 +1146,20 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
     </div>
   </div>
   <button class="notif-close" onclick="closeNewDocNotif()">×</button>
+</div>
+
+<!-- 결재 요청 알림 팝업 -->
+<div id="approvalReqNotif">
+  <div class="notif-icon">🔔</div>
+  <div class="notif-body">
+    <div class="notif-title" style="color:var(--accent)">결재 요청이 도착했습니다</div>
+    <div class="notif-msg" id="approvalReqNotifMsg"></div>
+    <div class="notif-actions">
+      <button class="btn btn-sm btn-accent" onclick="goToApprovalBox();closeApprovalReqNotif()">결재함 바로가기</button>
+      <button class="btn btn-sm btn-secondary" onclick="closeApprovalReqNotif()">닫기</button>
+    </div>
+  </div>
+  <button class="notif-close" onclick="closeApprovalReqNotif()">×</button>
 </div>
 
 </div><!-- end appPage -->
@@ -1657,17 +1674,50 @@ function handleRealtimeChange(payload) {
 
   if (eventType === 'INSERT' || eventType === 'UPDATE') {
     const rid = newRec.id;
-    // 자신의 변경은 이미 in-memory에 반영됨 → 건너뜀
+    // 자신이 발생시킨 변경은 이미 in-memory에 반영됨 → 건너뜀
     if (_localChanges.has(rid)) { _localChanges.delete(rid); return; }
-    applyDBChange(newRec.type, newRec.data);
-    // 다른 사용자의 새 문서 알림
-    if (eventType === 'INSERT' && newRec.type === 'docs' && newRec.data.writer !== currentUser.id && !newRec.data.draft) {
-      showNewDocNotif(newRec.data.title, getUser(newRec.data.writer).name, newRec.data.dept);
+
+    // ── 알림 처리: applyDBChange 전에 이전 상태와 비교 ──
+    if (newRec.type === 'docs') {
+      const newData = newRec.data;
+      const oldDoc  = DB.docs.find(d => d.id === newData.id); // 변경 전 상태
+
+      if (eventType === 'INSERT' && !newData.draft) {
+        // 내가 첫 번째 결재자(pending)인 경우 → 결재 요청 알림
+        const myStatus = newData.approvers?.find(a => a.id === currentUser.id)?.status;
+        if (myStatus === 'pending') {
+          showApprovalReqNotif(newData.title, getUser(newData.writer).name);
+        }
+      }
+
+      if (eventType === 'UPDATE' && oldDoc) {
+        const myNewStatus = newData.approvers?.find(a => a.id === currentUser.id)?.status;
+        const myOldStatus = oldDoc.approvers?.find(a => a.id === currentUser.id)?.status;
+        // 내 결재 차례가 새로 됨 (waiting → pending)
+        if (myNewStatus === 'pending' && myOldStatus !== 'pending') {
+          showApprovalReqNotif(newData.title, getUser(newData.writer).name);
+        }
+        // 내가 기안한 문서 최종 처리 알림
+        if (newData.writer === currentUser.id) {
+          if (newData.status === 'approved' && oldDoc.status !== 'approved') {
+            showToast(`"${newData.title}" 문서가 최종 결재 완료되었습니다! ✅`, 'success');
+            playNotifSound();
+          } else if (newData.status === 'rejected' && oldDoc.status !== 'rejected') {
+            showToast(`"${newData.title}" 문서가 반려되었습니다. ❌`, 'warning');
+            playNotifSound();
+          }
+        }
+      }
     }
+
     // 다른 사용자의 새 공지 알림
     if (eventType === 'INSERT' && newRec.type === 'notices' && newRec.data.author !== currentUser.id) {
       showToast(`새 공지사항: "${newRec.data.title}"`, 'info');
     }
+
+    // DB 업데이트 적용
+    applyDBChange(newRec.type, newRec.data);
+
   } else if (eventType === 'DELETE') {
     const rid = oldRec.id;
     if (_localChanges.has(rid)) { _localChanges.delete(rid); return; }
@@ -1891,8 +1941,11 @@ function showPage(name, navEl) {
 function updateBadge() {
   if (!currentUser) return;
   const cnt = DB.docs.filter(d => !d.draft && d.approvers.some(a=>a.id===currentUser.id&&a.status==='pending')).length;
+  const waitCnt = DB.docs.filter(d => !d.draft && d.approvers.some(a=>a.id===currentUser.id&&a.status==='waiting')).length;
   document.getElementById('approvalBadge').textContent = cnt;
   document.getElementById('pendingCnt').textContent = cnt;
+  const waitEl = document.getElementById('waitingCnt');
+  if (waitEl) waitEl.textContent = waitCnt;
   const tb = document.getElementById('topBadge');
   if (cnt>0) { tb.style.display='block'; } else { tb.style.display='none'; }
 }
@@ -2325,11 +2378,14 @@ function renderApprovalBox(filter) {
   let docs;
   if (filter==='pending') {
     docs = DB.docs.filter(d=>!d.draft&&d.approvers.some(a=>a.id===currentUser.id&&a.status==='pending'));
+  } else if (filter==='waiting') {
+    docs = DB.docs.filter(d=>!d.draft&&d.approvers.some(a=>a.id===currentUser.id&&a.status==='waiting'));
   } else {
     docs = DB.docs.filter(d=>!d.draft&&d.approvers.some(a=>a.id===currentUser.id&&(a.status==='approved'||a.status==='rejected')));
   }
   const tbody = document.getElementById('approvalTbody');
-  if (docs.length===0) { tbody.innerHTML=`<tr><td colspan="7"><div class="empty-state"><div class="icon">📭</div><p>${filter==='pending'?'결재 대기 문서가 없습니다.':'처리한 문서가 없습니다.'}</p></div></td></tr>`; return; }
+  const emptyMsg = filter==='pending'?'결재 대기 문서가 없습니다.':filter==='waiting'?'결재 예정 문서가 없습니다.':'처리한 문서가 없습니다.';
+  if (docs.length===0) { tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state"><div class="icon">📭</div><p>${emptyMsg}</p></div></td></tr>`; return; }
   tbody.innerHTML = docs.map((d,i)=>{
     const myIdx = d.approvers.findIndex(a=>a.id===currentUser.id);
     const total = d.approvers.length;
@@ -2370,7 +2426,12 @@ function renderApprovalBox(filter) {
       </td>
       <td>${d.urgency==='urgent'?'<span class="badge badge-pending">긴급</span>':'<span style="color:var(--text-muted)">일반</span>'}</td>
       <td>
-        <button class="btn btn-sm btn-primary" onclick="viewDoc('${d.id}')">${filter==='pending'?'결재처리':'상세보기'}</button>
+        ${filter==='pending'
+          ? `<button class="btn btn-sm btn-primary" onclick="viewDoc('${d.id}')">✅ 결재처리</button>`
+          : filter==='waiting'
+            ? `<button class="btn btn-sm btn-secondary" onclick="viewDoc('${d.id}')">📋 상세보기</button>`
+            : `<button class="btn btn-sm btn-outline" onclick="viewDoc('${d.id}')">상세보기</button>`
+        }
         ${filter==='done'&&d.status==='approved'?`<button class="btn btn-sm btn-secondary" style="background:#1a3a5c;color:#fff" onclick="printDoc('${d.id}')">🖨️ 출력</button>`:''}
       </td>
     </tr>`;
@@ -3762,6 +3823,23 @@ function closeNewDocNotif() {
   const el = document.getElementById('newDocNotif');
   if (el) el.classList.remove('show');
   if (notifTimer) { clearTimeout(notifTimer); notifTimer = null; }
+}
+
+let approvalReqTimer = null;
+function showApprovalReqNotif(title, writerName) {
+  const msg = document.getElementById('approvalReqNotifMsg');
+  if (msg) msg.textContent = `${writerName}님의 "${title}" 문서를 결재해 주세요.`;
+  const el = document.getElementById('approvalReqNotif');
+  if (!el) return;
+  el.classList.add('show');
+  playNotifSound();
+  if (approvalReqTimer) clearTimeout(approvalReqTimer);
+  approvalReqTimer = setTimeout(closeApprovalReqNotif, 10000);
+}
+function closeApprovalReqNotif() {
+  const el = document.getElementById('approvalReqNotif');
+  if (el) el.classList.remove('show');
+  if (approvalReqTimer) { clearTimeout(approvalReqTimer); approvalReqTimer = null; }
 }
 
 function goToApprovalBox() {
