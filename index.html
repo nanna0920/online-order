@@ -1821,6 +1821,7 @@ const DB = {
 let currentUser = null;
 let currentDocFilter = 'all';
 let selectedApprovers = [];
+let editingDocId = null; // 기안문서 수정 모드 시 문서 ID
 let lineSelectedApprovers = [];
 let docCounter = 6;
 
@@ -2291,35 +2292,64 @@ function serializeEditorHTML(el) {
 }
 
 function clearDocForm() {
+  editingDocId = null;
   document.getElementById('docTitle').value='';
   document.getElementById('docContent').innerHTML='';
   document.getElementById('docType').value='업무보고';
   document.getElementById('docUrgency').value='normal';
+  document.getElementById('docRetention').value='1년';
   selectedApprovers=[];
   renderDocApprovalLine();
+  _setWriteDocHeader(false);
   showToast('초기화되었습니다.','success');
+}
+
+function _setWriteDocHeader(isEdit) {
+  const h2 = document.querySelector('#page-writeDoc h2');
+  const p  = document.querySelector('#page-writeDoc p');
+  if (h2) h2.textContent = isEdit ? '✏️ 기안문서 수정' : '✍️ 문서 기안';
+  if (p)  p.textContent  = isEdit ? '기존 기안문서를 수정합니다.' : '새 결재 문서를 작성합니다.';
 }
 
 function saveDraft() {
   const title = document.getElementById('docTitle').value.trim();
   if (!title) { showToast('제목을 입력하세요.','error'); return; }
-  const year = new Date().getFullYear();
-  const id = generateDocId(currentUser.dept, year);
-  const draftDoc = {
-    id, title, type:document.getElementById('docType').value,
-    writer:currentUser.id, dept:currentUser.dept,
-    date:new Date().toLocaleDateString('ko-KR').replaceAll('. ','-').replace('.',''),
-    urgency:document.getElementById('docUrgency').value,
-    retention:document.getElementById('docRetention').value,
-    content:serializeEditorHTML(document.getElementById('docContent')),
-    approvers:selectedApprovers.map(id=>({id,name:getUser(id).name,dept:getUser(id).dept,pos:getUser(id).pos,status:'waiting',date:null,opinion:''})),
-    status:'draft', draft:true
-  };
-  DB.docs.push(draftDoc);
-  sbSave('docs', id, draftDoc);
-  clearDocForm();
-  showToast('임시저장되었습니다.','success');
+  const content = serializeEditorHTML(document.getElementById('docContent'));
+  const approvers = selectedApprovers.map(uid=>({id:uid,name:getUser(uid).name,dept:getUser(uid).dept,pos:getUser(uid).pos,status:'waiting',date:null,opinion:''}));
+
+  if (editingDocId) {
+    // 수정 모드: 기존 문서 업데이트
+    const doc = DB.docs.find(d=>d.id===editingDocId);
+    if (doc) {
+      doc.title=title; doc.type=document.getElementById('docType').value;
+      doc.urgency=document.getElementById('docUrgency').value;
+      doc.retention=document.getElementById('docRetention').value;
+      doc.content=content; doc.approvers=approvers;
+      sbSave('docs', doc.id, doc);
+    }
+    editingDocId=null; _setWriteDocHeader(false);
+    showToast('문서가 수정되어 임시저장되었습니다.','success');
+  } else {
+    const year = new Date().getFullYear();
+    const id = generateDocId(currentUser.dept, year);
+    const draftDoc = {
+      id, title, type:document.getElementById('docType').value,
+      writer:currentUser.id, dept:currentUser.dept,
+      date:new Date().toLocaleDateString('ko-KR').replaceAll('. ','-').replace('.',''),
+      urgency:document.getElementById('docUrgency').value,
+      retention:document.getElementById('docRetention').value,
+      content, approvers, status:'draft', draft:true
+    };
+    DB.docs.push(draftDoc);
+    sbSave('docs', id, draftDoc);
+    showToast('임시저장되었습니다.','success');
+  }
+  selectedApprovers=[];
+  renderDocApprovalLine();
+  document.getElementById('docTitle').value='';
+  document.getElementById('docContent').innerHTML='';
   updateBadge();
+  showPage('myDocs',null);
 }
 
 function submitDoc() {
@@ -2331,27 +2361,47 @@ function submitDoc() {
   if (!contentText) { showToast('내용을 입력하세요.','error'); return; }
   if (selectedApprovers.length===0) { showToast('결재자를 최소 1명 추가하세요.','error'); return; }
 
-  const year = new Date().getFullYear();
-  const id = generateDocId(currentUser.dept, year);
   const approvers = selectedApprovers.map((uid,i)=>({
     id:uid, name:getUser(uid).name, dept:getUser(uid).dept, pos:getUser(uid).pos,
     status: i===0?'pending':'waiting', date:null, opinion:''
   }));
-  const submittedDoc = {
-    id, title, type:document.getElementById('docType').value,
-    writer:currentUser.id, dept:currentUser.dept,
-    date:new Date().toLocaleDateString('ko-KR').replaceAll('. ','-').replace('.',''),
-    urgency:document.getElementById('docUrgency').value,
-    retention:document.getElementById('docRetention').value,
-    content, approvers, status:'pending', draft:false
-  };
-  DB.docs.push(submittedDoc);
-  sbSave('docs', id, submittedDoc);
-  clearDocForm();
+
+  if (editingDocId) {
+    // 수정 모드: 기존 임시저장 문서를 제출로 변환
+    const doc = DB.docs.find(d=>d.id===editingDocId);
+    if (doc) {
+      doc.title=title; doc.type=document.getElementById('docType').value;
+      doc.urgency=document.getElementById('docUrgency').value;
+      doc.retention=document.getElementById('docRetention').value;
+      doc.content=content; doc.approvers=approvers;
+      doc.status='pending'; doc.draft=false;
+      doc.date=new Date().toLocaleDateString('ko-KR').replaceAll('. ','-').replace('.','');
+      sbSave('docs', doc.id, doc);
+      showToast(`"${title}" 문서가 수정 제출되었습니다! 📤`,'success');
+      showNewDocNotif(title, currentUser.name, currentUser.dept);
+    }
+    editingDocId=null; _setWriteDocHeader(false);
+  } else {
+    const year = new Date().getFullYear();
+    const id = generateDocId(currentUser.dept, year);
+    const submittedDoc = {
+      id, title, type:document.getElementById('docType').value,
+      writer:currentUser.id, dept:currentUser.dept,
+      date:new Date().toLocaleDateString('ko-KR').replaceAll('. ','-').replace('.',''),
+      urgency:document.getElementById('docUrgency').value,
+      retention:document.getElementById('docRetention').value,
+      content, approvers, status:'pending', draft:false
+    };
+    DB.docs.push(submittedDoc);
+    sbSave('docs', id, submittedDoc);
+    showToast(`"${title}" 문서가 기안되었습니다! 📤`,'success');
+    showNewDocNotif(title, currentUser.name, currentUser.dept);
+  }
   selectedApprovers=[];
-  showToast(`"${title}" 문서가 기안되었습니다! 📤`,'success');
+  renderDocApprovalLine();
+  document.getElementById('docTitle').value='';
+  document.getElementById('docContent').innerHTML='';
   updateBadge();
-  showNewDocNotif(title, currentUser.name, currentUser.dept);
   showPage('myDocs',null);
 }
 
@@ -2388,9 +2438,29 @@ function renderMyDocs(filter) {
       <td>
         <button class="btn btn-sm btn-outline" onclick="viewDoc('${d.id}')">상세</button>
         ${d.status==='approved'?`<button class="btn btn-sm btn-accent" style="background:#1a3a5c;color:#fff" onclick="printDoc('${d.id}')">🖨️ 출력</button>`:''}
+        ${d.status==='draft'?`<button class="btn btn-sm btn-primary" onclick="editDoc('${d.id}')">✏️ 수정</button>`:''}
         ${d.status==='draft'?`<button class="btn btn-sm btn-danger" onclick="deleteDoc('${d.id}')">삭제</button>`:''}
       </td>
     </tr>`).join('');
+}
+
+function editDoc(docId) {
+  const doc = DB.docs.find(d=>d.id===docId);
+  if (!doc || doc.status!=='draft') return;
+  editingDocId = docId;
+  // 폼에 기존 데이터 로드
+  document.getElementById('docTitle').value = doc.title;
+  document.getElementById('docType').value = doc.type;
+  document.getElementById('docUrgency').value = doc.urgency||'normal';
+  document.getElementById('docRetention').value = doc.retention||'1년';
+  document.getElementById('docContent').innerHTML = doc.content||'';
+  // 결재라인 복원
+  selectedApprovers = doc.approvers.map(a=>a.id);
+  renderDocApprovalLine();
+  // 헤더 수정 모드로 변경
+  _setWriteDocHeader(true);
+  closeModal('docViewModal');
+  showPage('writeDoc', null);
 }
 
 function deleteDoc(id) {
@@ -2545,9 +2615,12 @@ function viewDoc(docId) {
       <button class="btn btn-success" onclick="processApproval('${doc.id}','approved')">✅ 결재승인</button>
     `;
   } else {
+    const isWriter = doc.writer === currentUser.id;
     footer.innerHTML = `
       <button class="btn btn-secondary" onclick="closeModal('docViewModal')">닫기</button>
       ${currentUser.role==='admin'?`<button class="btn btn-outline" onclick="openAdminDocEdit('${doc.id}')">🔧 문서정보 수정</button>`:''}
+      ${isWriter&&doc.status==='draft'?`<button class="btn btn-primary" onclick="editDoc('${doc.id}')">✏️ 수정</button>`:''}
+      ${isWriter&&doc.status==='draft'?`<button class="btn btn-danger" onclick="closeModal('docViewModal');deleteDoc('${doc.id}')">🗑️ 삭제</button>`:''}
       ${doc.status==='approved'||doc.status==='rejected'?`<button class="btn btn-primary" style="background:#1a3a5c" onclick="closeModal('docViewModal');printDoc('${doc.id}')">🖨️ 프린트 출력</button>`:''}
     `;
   }
@@ -2602,27 +2675,26 @@ function renderDocContent(htmlContent) {
   // contenteditable 제거
   tmp.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
 
-  // 체크박스: 이벤트 제거, checked 상태 보존, 클릭 불가 처리
+  // 체크박스: 기존 요소를 새 요소로 교체하여 checked 상태를 확실히 보존
   tmp.querySelectorAll('input[type="checkbox"]').forEach(chk => {
     const wasChecked = chk.hasAttribute('checked') || chk.checked;
-    chk.removeAttribute('onchange');
-    chk.removeAttribute('onclick');
-    chk.removeAttribute('onkeydown');
-    chk.disabled = true;
-    chk.style.opacity = '1';
-    chk.style.cursor = 'default';
-    if (wasChecked) {
-      chk.checked = true;
-      chk.setAttribute('checked', '');
-    } else {
-      chk.checked = false;
-      chk.removeAttribute('checked');
-    }
-    // checklist-item: .checked 클래스 동기화
     const item = chk.closest('.checklist-item');
+    const lbl  = chk.closest('label');
+
+    // 새 체크박스 요소 생성 (disabled 없이 pointer-events:none → V 표시 선명)
+    const newChk = document.createElement('input');
+    newChk.type = 'checkbox';
+    newChk.tabIndex = -1;
+    newChk.style.cssText = 'pointer-events:none;cursor:default;width:16px;height:16px;accent-color:#1a3a5c;flex-shrink:0;margin-top:4px;vertical-align:middle';
+    if (wasChecked) {
+      newChk.checked = true;
+      newChk.setAttribute('checked', '');
+    }
+    chk.replaceWith(newChk);
+
+    // checklist-item: .checked 클래스 동기화
     if (item) item.classList.toggle('checked', wasChecked);
     // 인라인 label 체크박스(테이블 등): 스타일 복원
-    const lbl = chk.closest('label');
     if (lbl) {
       lbl.style.pointerEvents = 'none';
       const span = lbl.querySelector('span');
