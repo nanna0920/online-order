@@ -246,7 +246,8 @@ canvas#sigCanvas { display:block; cursor:crosshair; touch-action:none; }
 .doc-editor-area .checklist-item { display:flex; align-items:flex-start; gap:8px; margin:3px 0; padding:2px 0; }
 .doc-editor-area .checklist-item input[type=checkbox] { width:16px; height:16px; margin-top:4px; flex-shrink:0; accent-color:var(--primary); cursor:pointer; }
 .doc-editor-area .checklist-item .check-label { flex:1; outline:none; min-width:10px; }
-.doc-editor-area .checklist-item.checked .check-label { text-decoration:line-through; color:var(--text-muted); }
+.doc-editor-area .checklist-item.checked .check-label,
+.checklist-item.checked .check-label { text-decoration:line-through; color:var(--text-muted); }
 
 /* APPROVAL LINE */
 .approval-line { display:flex; align-items:center; gap:0; flex-wrap:wrap; margin:16px 0; }
@@ -2251,6 +2252,21 @@ function saveAdminDocEdit() {
 // ============================================================
 // DOCUMENT ACTIONS
 // ============================================================
+
+// 체크박스 checked 프로퍼티를 HTML attribute에 동기화한 후 innerHTML 반환
+function serializeEditorHTML(el) {
+  el.querySelectorAll('input[type="checkbox"]').forEach(chk => {
+    if (chk.checked) chk.setAttribute('checked', '');
+    else chk.removeAttribute('checked');
+  });
+  // checklist-item의 checked 클래스도 동기화
+  el.querySelectorAll('.checklist-item').forEach(item => {
+    const chk = item.querySelector('input[type="checkbox"]');
+    if (chk) item.classList.toggle('checked', chk.checked);
+  });
+  return el.innerHTML;
+}
+
 function clearDocForm() {
   document.getElementById('docTitle').value='';
   document.getElementById('docContent').innerHTML='';
@@ -2272,7 +2288,7 @@ function saveDraft() {
     date:new Date().toLocaleDateString('ko-KR').replaceAll('. ','-').replace('.',''),
     urgency:document.getElementById('docUrgency').value,
     retention:document.getElementById('docRetention').value,
-    content:document.getElementById('docContent').innerHTML,
+    content:serializeEditorHTML(document.getElementById('docContent')),
     approvers:selectedApprovers.map(id=>({id,name:getUser(id).name,dept:getUser(id).dept,pos:getUser(id).pos,status:'waiting',date:null,opinion:''})),
     status:'draft', draft:true
   };
@@ -2286,7 +2302,7 @@ function saveDraft() {
 function submitDoc() {
   const title = document.getElementById('docTitle').value.trim();
   const editorEl = document.getElementById('docContent');
-  const content = editorEl.innerHTML;
+  const content = serializeEditorHTML(editorEl);
   const contentText = editorEl.innerText.trim();
   if (!title) { showToast('제목을 입력하세요.','error'); return; }
   if (!contentText) { showToast('내용을 입력하세요.','error'); return; }
@@ -3468,7 +3484,7 @@ function saveTemplate() {
   const name    = document.getElementById('templateName').value.trim();
   const docType = document.getElementById('templateDocType').value;
   const editorEl= document.getElementById('templateEditor');
-  const html    = editorEl.innerHTML;
+  const html    = serializeEditorHTML(editorEl);
   if (!name)                    { showToast('서식명을 입력하세요.', 'error'); return; }
   if (!editorEl.innerText.trim()){ showToast('서식 내용을 입력하세요.', 'error'); return; }
   const editId = document.getElementById('templateEditId').value;
