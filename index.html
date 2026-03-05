@@ -248,8 +248,9 @@ canvas#sigCanvas { display:block; cursor:crosshair; touch-action:none; }
 .checklist-item .check-label { flex:1; outline:none; min-width:10px; }
 .checklist-item.checked .check-label { text-decoration:line-through; color:var(--text-muted); }
 .doc-editor-area .checklist-item input[type=checkbox] { cursor:pointer; }
-/* 조회 모드: 체크박스 클릭 불가 */
-.doc-view-content .checklist-item input[type=checkbox] { cursor:not-allowed; pointer-events:none; }
+/* 조회 모드: 체크박스 클릭 불가, disabled 시에도 V 표시 선명하게 유지 */
+.doc-view-content input[type=checkbox] { pointer-events:none; cursor:default; }
+.doc-view-content input[type=checkbox]:disabled { opacity:1; }
 
 /* APPROVAL LINE */
 .approval-line { display:flex; align-items:center; gap:0; flex-wrap:wrap; margin:16px 0; }
