@@ -243,11 +243,13 @@ canvas#sigCanvas { display:block; cursor:crosshair; touch-action:none; }
 .doc-editor-area table { border-collapse:collapse; width:100%; margin:10px 0; }
 .doc-editor-area table td, .doc-editor-area table th { border:1px solid #aaa; padding:6px 10px; min-width:60px; }
 /* 체크리스트 */
-.doc-editor-area .checklist-item { display:flex; align-items:flex-start; gap:8px; margin:3px 0; padding:2px 0; }
-.doc-editor-area .checklist-item input[type=checkbox] { width:16px; height:16px; margin-top:4px; flex-shrink:0; accent-color:var(--primary); cursor:pointer; }
-.doc-editor-area .checklist-item .check-label { flex:1; outline:none; min-width:10px; }
-.doc-editor-area .checklist-item.checked .check-label,
+.checklist-item { display:flex; align-items:flex-start; gap:8px; margin:3px 0; padding:2px 0; }
+.checklist-item input[type=checkbox] { width:16px; height:16px; margin-top:4px; flex-shrink:0; accent-color:var(--primary); }
+.checklist-item .check-label { flex:1; outline:none; min-width:10px; }
 .checklist-item.checked .check-label { text-decoration:line-through; color:var(--text-muted); }
+.doc-editor-area .checklist-item input[type=checkbox] { cursor:pointer; }
+/* 조회 모드: 체크박스 클릭 불가 */
+.doc-view-content .checklist-item input[type=checkbox] { cursor:not-allowed; pointer-events:none; }
 
 /* APPROVAL LINE */
 .approval-line { display:flex; align-items:center; gap:0; flex-wrap:wrap; margin:16px 0; }
@@ -2503,7 +2505,7 @@ function viewDoc(docId) {
       <!-- 문서 내용 -->
       <div style="padding:18px 20px;border-bottom:${isApprover?'1.5px solid var(--border)':'none'}">
         <div style="font-size:11px;font-weight:700;color:var(--text-sub);margin-bottom:10px;letter-spacing:.5px">📄 문서 내용</div>
-        <div style="font-size:13px;line-height:1.85;min-height:120px;white-space:pre-wrap">${renderDocContent(doc.content)}</div>
+        <div class="doc-view-content" style="font-size:13px;line-height:1.85;min-height:120px;white-space:pre-wrap">${renderDocContent(doc.content)}</div>
       </div>
       <!-- 결재 의견 입력 (결재자만) -->
       ${isApprover ? `
@@ -2528,6 +2530,15 @@ function viewDoc(docId) {
       ${doc.status==='approved'||doc.status==='rejected'?`<button class="btn btn-primary" style="background:#1a3a5c" onclick="closeModal('docViewModal');printDoc('${doc.id}')">🖨️ 프린트 출력</button>`:''}
     `;
   }
+
+  // 조회 모드: checked 속성 → .checked 클래스 동기화 (체크박스 시각적 상태 반영)
+  document.querySelectorAll('#modalDocBody .checklist-item').forEach(item => {
+    const chk = item.querySelector('input[type="checkbox"]');
+    if (chk && chk.hasAttribute('checked')) {
+      chk.checked = true;
+      item.classList.add('checked');
+    }
+  });
 
   openModal('docViewModal');
 }
@@ -2568,12 +2579,13 @@ function processApproval(docId, action) {
 // ============================================================
 function renderDocContent(htmlContent) {
   if (!htmlContent) return '';
-  // HTML 태그가 포함된 경우 (에디터 작성) → 체크리스트 인터랙션 유지하며 반환
+  // HTML 태그가 포함된 경우 (에디터 작성)
   if (/<[a-zA-Z][\s\S]*>/i.test(htmlContent)) {
-    // 조회 모드에서 체크박스 클릭 가능하도록 (contenteditable 제거)
+    // 조회 모드: contenteditable 제거, 이벤트 핸들러 제거
     return htmlContent
       .replace(/contenteditable="true"/g, 'contenteditable="false"')
-      .replace(/onkeydown="[^"]*"/g, '');
+      .replace(/onkeydown="[^"]*"/g, '')
+      .replace(/onchange="[^"]*"/g, '');
   }
   // 일반 텍스트인 경우 → \n을 <br>로 변환
   return htmlContent.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
