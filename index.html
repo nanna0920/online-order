@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>전자결재시스템 | e-Approval</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=Noto+Serif+KR:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root {
   --primary: #1a3a5c;
@@ -490,7 +491,7 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
         <label>비밀번호</label>
         <input type="password" id="loginPw" placeholder="비밀번호를 입력하세요" value="1234">
       </div>
-      <button class="btn btn-primary btn-full" style="margin-top:8px" onclick="doLogin()">🔐 로그인</button>
+      <button id="loginBtn" class="btn btn-primary btn-full" style="margin-top:8px" onclick="doLogin()">🔐 로그인</button>
       <div style="text-align:center;margin-top:18px;">
         <span style="font-size:13px;color:var(--text-sub)">계정이 없으신가요? </span>
         <button class="link-text" onclick="showRegister()">회원가입</button>
@@ -1562,6 +1563,74 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
 
 <script>
 // ============================================================
+// SUPABASE 설정
+// ============================================================
+const SUPABASE_URL = 'https://ssybkhhejxsvhekfdmmg.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzeWJraGhlanhzdmhla2ZkbW1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NzgzNjksImV4cCI6MjA4ODI1NDM2OX0.2xiLYkptBFDYsqsCr_OxxkT4h0hmYlM21BApdFKmV54';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Supabase ID 생성 헬퍼
+function sbId(type, itemId) {
+  if (type === 'users') return 'user-' + itemId;
+  if (type === 'notices') return 'notice-' + itemId;
+  if (type === 'lines') return 'line-' + itemId;
+  if (type === 'depts') return 'dept-' + itemId;
+  return String(itemId); // docs, templates
+}
+
+// Supabase 저장 (upsert)
+function sbSave(type, itemId, data) {
+  sb.from('online_items').upsert({
+    id: sbId(type, itemId), type, data,
+    updated_at: new Date().toISOString()
+  }).then(({error}) => { if (error) console.error('Supabase 저장 오류:', error); });
+}
+
+// Supabase 삭제
+function sbRemove(type, itemId) {
+  sb.from('online_items').delete().eq('id', sbId(type, itemId))
+    .then(({error}) => { if (error) console.error('Supabase 삭제 오류:', error); });
+}
+
+// Supabase에서 전체 데이터 로드
+async function loadFromSupabase() {
+  try {
+    const {data, error} = await sb.from('online_items').select('*');
+    if (error) throw error;
+    if (data && data.length > 0) {
+      const byType = {};
+      data.forEach(r => { if (!byType[r.type]) byType[r.type] = []; byType[r.type].push(r.data); });
+      if (byType.docs && byType.docs.length)      DB.docs      = byType.docs;
+      if (byType.users && byType.users.length)     DB.users     = byType.users;
+      if (byType.notices && byType.notices.length) DB.notices   = byType.notices;
+      if (byType.lines && byType.lines.length)     DB.lines     = byType.lines;
+      if (byType.depts && byType.depts.length)     DB.depts     = byType.depts;
+      if (byType.templates && byType.templates.length) DB.templates = byType.templates;
+    } else {
+      // 최초 실행: 기본 데이터를 Supabase에 저장
+      await seedSupabase();
+    }
+    return true;
+  } catch(e) {
+    console.error('Supabase 로드 오류:', e);
+    return false;
+  }
+}
+
+// 기본 데이터를 Supabase에 시드
+async function seedSupabase() {
+  const items = [
+    ...DB.users.map(u    => ({id: sbId('users', u.id),          type:'users',     data:u})),
+    ...DB.docs.map(d     => ({id: sbId('docs', d.id),            type:'docs',      data:d})),
+    ...DB.notices.map(n  => ({id: sbId('notices', n.id),         type:'notices',   data:n})),
+    ...DB.lines.map(l    => ({id: sbId('lines', l.id),           type:'lines',     data:l})),
+    ...DB.depts.map(d    => ({id: sbId('depts', d.name),         type:'depts',     data:d})),
+  ];
+  const {error} = await sb.from('online_items').upsert(items);
+  if (error) console.error('Supabase 시드 오류:', error);
+}
+
+// ============================================================
 // DATA STORE
 // ============================================================
 const DB = {
@@ -1624,9 +1693,15 @@ function generateDocId(dept, year) {
 // ============================================================
 // AUTH
 // ============================================================
-function doLogin() {
+async function doLogin() {
   const id = document.getElementById('loginId').value.trim();
   const pw = document.getElementById('loginPw').value.trim();
+  const loginBtn = document.getElementById('loginBtn');
+  if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = '⏳ 로딩 중...'; }
+  try {
+    await loadFromSupabase();
+  } catch(e) { /* 오류 시 기본 데이터로 진행 */ }
+  if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = '🔐 로그인'; }
   const user = DB.users.find(u => u.id === id && u.pw === pw && u.active);
   if (!user) { showToast('아이디 또는 비밀번호가 잘못되었습니다.', 'error'); return; }
   currentUser = user;
@@ -1678,7 +1753,9 @@ function doRegister() {
   if (!name||!id||!pw||!dept||!pos) { showToast('필수 항목을 입력하세요.','error'); return; }
   if (pw !== pw2) { showToast('비밀번호가 일치하지 않습니다.','error'); return; }
   if (DB.users.find(u=>u.id===id)) { showToast('이미 사용 중인 아이디입니다.','error'); return; }
-  DB.users.push({id,pw,name,dept,pos,email:document.getElementById('regEmail').value,tel:document.getElementById('regTel').value,role:'user',sig:'',active:true});
+  const newUser = {id,pw,name,dept,pos,email:document.getElementById('regEmail').value,tel:document.getElementById('regTel').value,role:'user',sig:'',active:true};
+  DB.users.push(newUser);
+  sbSave('users', id, newUser);
   showToast('회원가입이 완료되었습니다! 로그인해주세요.','success');
   showLogin();
   document.getElementById('loginId').value = id;
@@ -2014,6 +2091,7 @@ function saveAdminDocEdit() {
   doc.id   = newNo;
   doc.date = newDate;
   doc.dept = newDept;
+  sbSave('docs', doc.id, doc);
   closeModal('adminDocEditModal');
   showToast('문서 정보가 수정되었습니다.','success');
   // 목록 갱신
@@ -2039,7 +2117,7 @@ function saveDraft() {
   if (!title) { showToast('제목을 입력하세요.','error'); return; }
   const year = new Date().getFullYear();
   const id = generateDocId(currentUser.dept, year);
-  DB.docs.push({
+  const draftDoc = {
     id, title, type:document.getElementById('docType').value,
     writer:currentUser.id, dept:currentUser.dept,
     date:new Date().toLocaleDateString('ko-KR').replaceAll('. ','-').replace('.',''),
@@ -2048,7 +2126,9 @@ function saveDraft() {
     content:document.getElementById('docContent').innerHTML,
     approvers:selectedApprovers.map(id=>({id,name:getUser(id).name,dept:getUser(id).dept,pos:getUser(id).pos,status:'waiting',date:null,opinion:''})),
     status:'draft', draft:true
-  });
+  };
+  DB.docs.push(draftDoc);
+  sbSave('docs', id, draftDoc);
   clearDocForm();
   showToast('임시저장되었습니다.','success');
   updateBadge();
@@ -2069,14 +2149,16 @@ function submitDoc() {
     id:uid, name:getUser(uid).name, dept:getUser(uid).dept, pos:getUser(uid).pos,
     status: i===0?'pending':'waiting', date:null, opinion:''
   }));
-  DB.docs.push({
+  const submittedDoc = {
     id, title, type:document.getElementById('docType').value,
     writer:currentUser.id, dept:currentUser.dept,
     date:new Date().toLocaleDateString('ko-KR').replaceAll('. ','-').replace('.',''),
     urgency:document.getElementById('docUrgency').value,
     retention:document.getElementById('docRetention').value,
     content, approvers, status:'pending', draft:false
-  });
+  };
+  DB.docs.push(submittedDoc);
+  sbSave('docs', id, submittedDoc);
   clearDocForm();
   selectedApprovers=[];
   showToast(`"${title}" 문서가 기안되었습니다! 📤`,'success');
@@ -2127,6 +2209,7 @@ function deleteDoc(id) {
   if (!confirm('정말 삭제하시겠습니까?')) return;
   const i = DB.docs.findIndex(d=>d.id===id);
   if (i>-1) DB.docs.splice(i,1);
+  sbRemove('docs', id);
   renderMyDocs(currentDocFilter);
   showToast('문서가 삭제되었습니다.','success');
 }
@@ -2301,6 +2384,7 @@ function processApproval(docId, action) {
     }
   }
 
+  sbSave('docs', docId, doc);
   closeModal('docViewModal');
   loadApprovalBox();
   updateBadge();
@@ -2453,6 +2537,7 @@ function deleteLine(lineId) {
   if (!confirm('결재라인을 삭제하시겠습니까?')) return;
   const i = DB.lines.findIndex(l=>l.id===lineId);
   if (i>-1) DB.lines.splice(i,1);
+  sbRemove('lines', lineId);
   loadLines();
   showToast('삭제되었습니다.','success');
 }
@@ -2500,7 +2585,9 @@ function saveLine() {
   if (!name) { showToast('라인명을 입력하세요.','error'); return; }
   if (lineSelectedApprovers.length===0) { showToast('결재자를 선택하세요.','error'); return; }
   const newId = DB.lines.length>0?Math.max(...DB.lines.map(l=>l.id))+1:1;
-  DB.lines.push({id:newId, name, docType:document.getElementById('lineDocType').value, approvers:[...lineSelectedApprovers], date:new Date().toLocaleDateString('ko-KR').slice(0,10)});
+  const newLine = {id:newId, name, docType:document.getElementById('lineDocType').value, approvers:[...lineSelectedApprovers], date:new Date().toLocaleDateString('ko-KR').slice(0,10)};
+  DB.lines.push(newLine);
+  sbSave('lines', newId, newLine);
   closeModal('lineModal');
   loadLines();
   showToast('결재라인이 저장되었습니다.','success');
@@ -2619,6 +2706,7 @@ function deleteNotice(id) {
   if (!confirm('공지사항을 삭제하시겠습니까?')) return;
   const i = DB.notices.findIndex(n=>n.id===id);
   if (i>-1) DB.notices.splice(i,1);
+  sbRemove('notices', id);
   loadNotice();
   showToast('삭제되었습니다.','success');
 }
@@ -2695,6 +2783,7 @@ function saveNotice() {
       n.pin = pin;
       n.category = category;
       n.editDate = today;
+      sbSave('notices', n.id, n);
     }
     closeModal('noticeModal');
     loadNotice();
@@ -2702,7 +2791,9 @@ function saveNotice() {
   } else {
     // 등록 모드
     const newId = DB.notices.length>0?Math.max(...DB.notices.map(n=>n.id))+1:1;
-    DB.notices.push({id:newId, title, content, author:currentUser.id, date:today, pin, category});
+    const newNotice = {id:newId, title, content, author:currentUser.id, date:today, pin, category};
+    DB.notices.push(newNotice);
+    sbSave('notices', newId, newNotice);
     closeModal('noticeModal');
     loadNotice();
     showToast('공지사항이 등록되었습니다.','success');
@@ -2756,7 +2847,9 @@ function saveDept() {
   const code = document.getElementById('deptCode').value.trim();
   if (!name) { showToast('부서명을 입력하세요.','error'); return; }
   if (DB.depts.find(d=>d.name===name)) { showToast('이미 존재하는 부서명입니다.','error'); return; }
-  DB.depts.push({name, code:code||name.slice(0,3).toUpperCase(), head:document.getElementById('deptHead').value});
+  const newDept = {name, code:code||name.slice(0,3).toUpperCase(), head:document.getElementById('deptHead').value};
+  DB.depts.push(newDept);
+  sbSave('depts', name, newDept);
   closeModal('deptModal');
   loadOrgChart();
   showToast(`"${name}" 부서가 추가되었습니다.`,'success');
@@ -2822,8 +2915,10 @@ function saveDeptEdit() {
   dept.head = newHead;
   // 소속 직원 부서명도 일괄 변경
   if (oldName !== newName) {
-    DB.users.forEach(u=>{ if(u.dept===oldName) u.dept=newName; });
+    DB.users.forEach(u=>{ if(u.dept===oldName) { u.dept=newName; sbSave('users', u.id, u); } });
+    sbRemove('depts', oldName);
   }
+  sbSave('depts', newName, dept);
   closeModal('deptEditModal');
   loadOrgChart();
   showToast(`"${newName}" 부서 정보가 수정되었습니다.`,'success');
@@ -2835,6 +2930,7 @@ function deleteDept() {
   if (hasMembers) { showToast('소속 구성원이 있는 부서는 삭제할 수 없습니다.','error'); return; }
   if (!confirm(`"${name}" 부서를 삭제하시겠습니까?`)) return;
   DB.depts = DB.depts.filter(d=>d.name!==name);
+  sbRemove('depts', name);
   closeModal('deptEditModal');
   loadOrgChart();
   showToast('부서가 삭제되었습니다.','success');
@@ -2881,6 +2977,7 @@ function saveMemberEdit() {
   u.name = document.getElementById('memberEditName').value.trim() || u.name;
   u.email = document.getElementById('memberEditEmail').value.trim();
   u.tel = document.getElementById('memberEditTel').value.trim();
+  sbSave('users', uid, u);
   closeModal('memberEditModal');
   renderMembers('');
   loadOrgChart();
@@ -2891,6 +2988,7 @@ function toggleUserActive(uid) {
   if (uid===currentUser.id) { showToast('자기 자신은 변경할 수 없습니다.','error'); return; }
   const u = getUser(uid);
   u.active = !u.active;
+  sbSave('users', uid, u);
   renderMembers('');
   showToast(`${u.name}님 상태가 변경되었습니다.`,'success');
 }
@@ -2898,6 +2996,7 @@ function toggleUserRole(uid) {
   if (uid===currentUser.id) { showToast('자기 자신은 변경할 수 없습니다.','error'); return; }
   const u = getUser(uid);
   u.role = u.role==='admin'?'user':'admin';
+  sbSave('users', uid, u);
   renderMembers('');
   showToast(`${u.name}님 권한이 변경되었습니다.`,'success');
 }
@@ -2925,6 +3024,7 @@ function saveSettings() {
   currentUser.name = document.getElementById('settingName').value;
   currentUser.email = document.getElementById('settingEmail').value;
   currentUser.tel = document.getElementById('settingTel').value;
+  sbSave('users', currentUser.id, currentUser);
   document.getElementById('sideUserName').textContent = currentUser.name;
   showToast('설정이 저장되었습니다.','success');
 }
@@ -2936,6 +3036,7 @@ function changePw() {
   if (!nw||nw.length<4) { showToast('새 비밀번호는 4자 이상이어야 합니다.','error'); return; }
   if (nw!==nw2) { showToast('새 비밀번호가 일치하지 않습니다.','error'); return; }
   currentUser.pw = nw;
+  sbSave('users', currentUser.id, currentUser);
   document.getElementById('settingCurPw').value='';
   document.getElementById('settingNewPw').value='';
   document.getElementById('settingNewPw2').value='';
@@ -3217,12 +3318,11 @@ function saveTemplate() {
   const now = new Date().toLocaleDateString('ko-KR').replace(/\. /g,'-').replace('.','');
   if (editId) {
     const t = DB.templates.find(t=>t.id===editId);
-    if (t) { t.name=name; t.docType=docType; t.content=html; t.updatedAt=now; }
+    if (t) { t.name=name; t.docType=docType; t.content=html; t.updatedAt=now; sbSave('templates', t.id, t); }
   } else {
-    DB.templates.push({
-      id: 'TPL-'+String(tplCounter++).padStart(3,'0'),
-      name, docType, content: html, updatedAt: now
-    });
+    const newTpl = {id: 'TPL-'+String(tplCounter++).padStart(3,'0'), name, docType, content: html, updatedAt: now};
+    DB.templates.push(newTpl);
+    sbSave('templates', newTpl.id, newTpl);
   }
   closeModal('templateModal');
   loadTemplates();
@@ -3234,6 +3334,7 @@ function deleteTemplate(id) {
   if (!t) return;
   if (!confirm(`"${t.name}" 서식을 삭제하시겠습니까?`)) return;
   DB.templates = DB.templates.filter(t=>t.id!==id);
+  sbRemove('templates', id);
   loadTemplates();
   showToast('서식이 삭제되었습니다.', 'success');
 }
@@ -3498,6 +3599,7 @@ function saveSig() {
   }
   if (!dataUrl) return;
   currentUser.sigData = dataUrl;
+  sbSave('users', currentUser.id, currentUser);
   updateSigPreview(dataUrl);
   const label = {draw:'서명', text:'텍스트 서명', stamp:'도장', upload:'이미지 서명'}[currentSigMode] || '서명';
   showToast(`${label}이 저장되었습니다. 결재 출력 시 자동 적용됩니다. ✅`, 'success');
@@ -3506,6 +3608,7 @@ function saveSig() {
 function deleteSig() {
   if (!confirm('저장된 서명/도장을 삭제하시겠습니까?')) return;
   currentUser.sigData = null;
+  sbSave('users', currentUser.id, currentUser);
   clearSigCanvas();
   const sigTextEl = document.getElementById('sigText');
   if (sigTextEl) sigTextEl.value = '';
