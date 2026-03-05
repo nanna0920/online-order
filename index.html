@@ -2552,30 +2552,6 @@ function viewDoc(docId) {
     `;
   }
 
-  // 조회 모드: 모든 체크박스 시각적 상태 복원 + 클릭 불가 처리
-  document.querySelectorAll('#modalDocBody input[type="checkbox"]').forEach(chk => {
-    // checked 속성이 있으면 DOM 프로퍼티도 true로 설정
-    if (chk.hasAttribute('checked')) chk.checked = true;
-    // 클릭 불가
-    chk.disabled = true;
-    // checklist-item 클래스 동기화
-    const item = chk.closest('.checklist-item');
-    if (item) item.classList.toggle('checked', chk.checked);
-    // 인라인 라벨 스타일 복원 (테이블 내부 체크박스)
-    const lbl = chk.closest('label');
-    if (lbl) {
-      lbl.style.pointerEvents = 'none';
-      const span = lbl.querySelector('span');
-      if (span && chk.checked) {
-        span.style.color = '#1a3a5c';
-        span.style.fontWeight = '700';
-        lbl.style.background = '#e8f0fe';
-        lbl.style.borderRadius = '4px';
-        lbl.style.padding = '1px 6px 1px 2px';
-      }
-    }
-  });
-
   openModal('docViewModal');
 }
 
@@ -2615,16 +2591,52 @@ function processApproval(docId, action) {
 // ============================================================
 function renderDocContent(htmlContent) {
   if (!htmlContent) return '';
-  // HTML 태그가 포함된 경우 (에디터 작성)
-  if (/<[a-zA-Z][\s\S]*>/i.test(htmlContent)) {
-    // 조회 모드: contenteditable 제거, 이벤트 핸들러 제거
-    return htmlContent
-      .replace(/contenteditable="true"/g, 'contenteditable="false"')
-      .replace(/onkeydown="[^"]*"/g, '')
-      .replace(/onchange="[^"]*"/g, '');
+  if (!/<[a-zA-Z][\s\S]*>/i.test(htmlContent)) {
+    // 일반 텍스트 → \n을 <br>로 변환
+    return htmlContent.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
   }
-  // 일반 텍스트인 경우 → \n을 <br>로 변환
-  return htmlContent.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  // DOM 기반으로 조회 모드 변환 (regex보다 신뢰성 높음)
+  const tmp = document.createElement('div');
+  tmp.innerHTML = htmlContent;
+
+  // contenteditable 제거
+  tmp.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+
+  // 체크박스: 이벤트 제거, checked 상태 보존, 클릭 불가 처리
+  tmp.querySelectorAll('input[type="checkbox"]').forEach(chk => {
+    const wasChecked = chk.hasAttribute('checked') || chk.checked;
+    chk.removeAttribute('onchange');
+    chk.removeAttribute('onclick');
+    chk.removeAttribute('onkeydown');
+    chk.disabled = true;
+    chk.style.opacity = '1';
+    chk.style.cursor = 'default';
+    if (wasChecked) {
+      chk.checked = true;
+      chk.setAttribute('checked', '');
+    } else {
+      chk.checked = false;
+      chk.removeAttribute('checked');
+    }
+    // checklist-item: .checked 클래스 동기화
+    const item = chk.closest('.checklist-item');
+    if (item) item.classList.toggle('checked', wasChecked);
+    // 인라인 label 체크박스(테이블 등): 스타일 복원
+    const lbl = chk.closest('label');
+    if (lbl) {
+      lbl.style.pointerEvents = 'none';
+      const span = lbl.querySelector('span');
+      if (wasChecked && span) {
+        span.style.color = '#1a3a5c';
+        span.style.fontWeight = '700';
+        lbl.style.background = '#e8f0fe';
+        lbl.style.borderRadius = '4px';
+        lbl.style.padding = '1px 6px 1px 2px';
+      }
+    }
+  });
+
+  return tmp.innerHTML;
 }
 
 // ============================================================
@@ -3954,7 +3966,8 @@ function initDocEditorCheckbox() {
       e.preventDefault();
       e.stopPropagation();
       chk.checked = !chk.checked;
-      inlineChkChange(chk);
+      if (chk.closest('.checklist-item')) toggleCheckItem(chk);
+      else inlineChkChange(chk);
       return;
     }
 
