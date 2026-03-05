@@ -799,11 +799,11 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
         <button class="btn btn-primary" onclick="showPage('writeDoc',null)">+ 새 기안</button>
       </div>
       <div class="tabs">
-        <button class="tab active" onclick="filterMyDocs('all',this)">전체</button>
-        <button class="tab" onclick="filterMyDocs('draft',this)">임시저장</button>
-        <button class="tab" onclick="filterMyDocs('pending',this)">진행중</button>
-        <button class="tab" onclick="filterMyDocs('approved',this)">결재완료</button>
-        <button class="tab" onclick="filterMyDocs('rejected',this)">반려</button>
+        <button class="tab active" onclick="filterMyDocs('all',this)">전체 <span id="myDocsCnt_all" class="chip" style="margin-left:4px">0</span></button>
+        <button class="tab" onclick="filterMyDocs('draft',this)">임시저장 <span id="myDocsCnt_draft" class="chip" style="margin-left:4px">0</span></button>
+        <button class="tab" onclick="filterMyDocs('pending',this)">진행중 <span id="myDocsCnt_pending" class="chip" style="margin-left:4px">0</span></button>
+        <button class="tab" onclick="filterMyDocs('approved',this)">결재완료 <span id="myDocsCnt_approved" class="chip" style="margin-left:4px;background:rgba(30,138,94,0.15);color:#1e8a5e">0</span></button>
+        <button class="tab" onclick="filterMyDocs('rejected',this)">반려 <span id="myDocsCnt_rejected" class="chip" style="margin-left:4px;background:rgba(192,57,43,0.15);color:#c0392b">0</span></button>
       </div>
       <div class="card">
         <div class="card-header">
@@ -2483,7 +2483,23 @@ function submitDoc() {
 // ============================================================
 let myDocsSearch = '';
 function loadMyDocs() {
+  updateMyDocsCounts();
   renderMyDocs(currentDocFilter);
+}
+
+function updateMyDocsCounts() {
+  const mine = DB.docs.filter(d => d.writer === currentUser.id);
+  const counts = {
+    all:      mine.length,
+    draft:    mine.filter(d => d.status === 'draft').length,
+    pending:  mine.filter(d => d.status === 'pending').length,
+    approved: mine.filter(d => d.status === 'approved').length,
+    rejected: mine.filter(d => d.status === 'rejected').length
+  };
+  Object.entries(counts).forEach(([key, val]) => {
+    const el = document.getElementById('myDocsCnt_' + key);
+    if (el) el.textContent = val;
+  });
 }
 function filterMyDocs(filter, el) {
   currentDocFilter = filter;
