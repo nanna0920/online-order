@@ -1959,16 +1959,21 @@ function updateBadge() {
 // DASHBOARD
 // ============================================================
 function loadDashboard() {
-  // Stats
-  const myDocs = DB.docs.filter(d=>d.writer===currentUser.id&&!d.draft);
+  // Stats - 결재함 탭 기준으로 계산
+  const myDocs  = DB.docs.filter(d=>d.writer===currentUser.id&&!d.draft);
+  // 결재 대기 탭: 내가 결재해야 할 문서 (pending)
   const pending = DB.docs.filter(d=>!d.draft&&d.approvers.some(a=>a.id===currentUser.id&&a.status==='pending'));
-  const approved = DB.docs.filter(d=>d.status==='approved');
-  const total = DB.docs.filter(d=>!d.draft).length;
+  // 결재 예정 탭: 내가 예정된 문서 (waiting)
+  const waiting = DB.docs.filter(d=>!d.draft&&d.approvers.some(a=>a.id===currentUser.id&&a.status==='waiting'));
+  // 처리 완료 탭: 내가 처리한 문서 (approved or rejected)
+  const done    = DB.docs.filter(d=>!d.draft&&d.approvers.some(a=>a.id===currentUser.id&&(a.status==='approved'||a.status==='rejected')));
+  // 전체 문서: 결재함에 있는 전체 (대기 + 예정 + 완료)
+  const total   = pending.length + waiting.length + done.length;
 
   document.getElementById('statsGrid').innerHTML = `
-    <div class="stat-card" style="cursor:pointer" onclick="gotoMyDocsTab('all')" title="내 문서 전체 보기"><div class="stat-icon" style="background:#e3f0fb">📋</div><div class="stat-info"><div class="num">${total}</div><div class="label">전체 문서</div></div></div>
+    <div class="stat-card" style="cursor:pointer" onclick="gotoApprovalTab('pending')" title="결재함 전체 보기"><div class="stat-icon" style="background:#e3f0fb">📋</div><div class="stat-info"><div class="num">${total}</div><div class="label">전체 문서</div></div></div>
     <div class="stat-card" style="cursor:pointer" onclick="gotoApprovalTab('pending')" title="결재 대기 보기"><div class="stat-icon" style="background:#fff3cd">⏳</div><div class="stat-info"><div class="num">${pending.length}</div><div class="label">결재 대기</div></div></div>
-    <div class="stat-card" style="cursor:pointer" onclick="gotoApprovalTab('done')" title="결재 완료 보기"><div class="stat-icon" style="background:#d4edda">✅</div><div class="stat-info"><div class="num">${approved.length}</div><div class="label">결재 완료</div></div></div>
+    <div class="stat-card" style="cursor:pointer" onclick="gotoApprovalTab('done')" title="결재 완료 보기"><div class="stat-icon" style="background:#d4edda">✅</div><div class="stat-info"><div class="num">${done.length}</div><div class="label">결재 완료</div></div></div>
     <div class="stat-card" style="cursor:pointer" onclick="gotoMyDocsTab('all')" title="내 기안 문서 보기"><div class="stat-icon" style="background:#f0e6ff">📝</div><div class="stat-info"><div class="num">${myDocs.length}</div><div class="label">내 기안 문서</div></div></div>
   `;
 
