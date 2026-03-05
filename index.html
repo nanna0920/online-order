@@ -2260,6 +2260,26 @@ function serializeEditorHTML(el) {
   el.querySelectorAll('input[type="checkbox"]').forEach(chk => {
     if (chk.checked) chk.setAttribute('checked', '');
     else chk.removeAttribute('checked');
+    // 인라인 라벨 체크박스(테이블 내부 등): span 스타일을 inline style로 저장
+    const lbl = chk.closest('label');
+    if (lbl) {
+      const span = lbl.querySelector('span');
+      if (span) {
+        if (chk.checked) {
+          span.style.color = '#1a3a5c';
+          span.style.fontWeight = '700';
+          lbl.style.background = '#e8f0fe';
+          lbl.style.borderRadius = '4px';
+          lbl.style.padding = '1px 6px 1px 2px';
+        } else {
+          span.style.color = '';
+          span.style.fontWeight = '';
+          lbl.style.background = '';
+          lbl.style.borderRadius = '';
+          lbl.style.padding = '';
+        }
+      }
+    }
   });
   // checklist-item의 checked 클래스도 동기화
   el.querySelectorAll('.checklist-item').forEach(item => {
@@ -2531,12 +2551,27 @@ function viewDoc(docId) {
     `;
   }
 
-  // 조회 모드: checked 속성 → .checked 클래스 동기화 (체크박스 시각적 상태 반영)
-  document.querySelectorAll('#modalDocBody .checklist-item').forEach(item => {
-    const chk = item.querySelector('input[type="checkbox"]');
-    if (chk && chk.hasAttribute('checked')) {
-      chk.checked = true;
-      item.classList.add('checked');
+  // 조회 모드: 모든 체크박스 시각적 상태 복원 + 클릭 불가 처리
+  document.querySelectorAll('#modalDocBody input[type="checkbox"]').forEach(chk => {
+    // checked 속성이 있으면 DOM 프로퍼티도 true로 설정
+    if (chk.hasAttribute('checked')) chk.checked = true;
+    // 클릭 불가
+    chk.disabled = true;
+    // checklist-item 클래스 동기화
+    const item = chk.closest('.checklist-item');
+    if (item) item.classList.toggle('checked', chk.checked);
+    // 인라인 라벨 스타일 복원 (테이블 내부 체크박스)
+    const lbl = chk.closest('label');
+    if (lbl) {
+      lbl.style.pointerEvents = 'none';
+      const span = lbl.querySelector('span');
+      if (span && chk.checked) {
+        span.style.color = '#1a3a5c';
+        span.style.fontWeight = '700';
+        lbl.style.background = '#e8f0fe';
+        lbl.style.borderRadius = '4px';
+        lbl.style.padding = '1px 6px 1px 2px';
+      }
     }
   });
 
