@@ -1672,6 +1672,65 @@ function initRealtime() {
     });
 }
 
+// ============================================================
+// POLLING FALLBACK - Realtime 보조 (15초 변경감지 + 2분 전체동기화)
+// ============================================================
+let _lastSyncTime = new Date().toISOString();
+let _pollTimer    = null;
+let _fullSyncTimer = null;
+
+function startPolling() {
+  stopPolling();
+  // 로그인 시점 기준으로 이후 변경만 감지 (2초 여유)
+  _lastSyncTime = new Date(Date.now() - 2000).toISOString();
+  _pollTimer     = setInterval(pollChanges,       15000); // 15초마다 증분 동기화
+  _fullSyncTimer = setInterval(fullSyncSupabase, 120000); // 2분마다 전체 동기화
+}
+
+function stopPolling() {
+  if (_pollTimer)     { clearInterval(_pollTimer);     _pollTimer = null; }
+  if (_fullSyncTimer) { clearInterval(_fullSyncTimer); _fullSyncTimer = null; }
+}
+
+// 증분 동기화: updated_at 이후 추가·수정된 항목 적용
+async function pollChanges() {
+  if (!currentUser) return;
+  try {
+    const { data, error } = await sb.from('online_items')
+      .select('*')
+      .gt('updated_at', _lastSyncTime)
+      .order('updated_at', { ascending: true });
+    if (error || !data || !data.length) return;
+    _lastSyncTime = data[data.length - 1].updated_at;
+    data.forEach(r => {
+      // 자신이 방금 저장한 항목은 이미 메모리에 있음 → 건너뜀
+      if (!_localChanges.has(r.id)) applyDBChange(r.type, r.data);
+    });
+    refreshCurrentPage();
+    updateBadge();
+  } catch(e) { console.warn('폴링 오류:', e); }
+}
+
+// 전체 동기화: 삭제된 항목까지 포함하여 Supabase 기준으로 전체 갱신
+async function fullSyncSupabase() {
+  if (!currentUser) return;
+  try {
+    const { data, error } = await sb.from('online_items').select('*');
+    if (error || !data || !data.length) return;
+    const byType = {};
+    data.forEach(r => { if (!byType[r.type]) byType[r.type] = []; byType[r.type].push(r.data); });
+    if (byType.docs)      DB.docs      = byType.docs;
+    if (byType.users)     DB.users     = byType.users;
+    if (byType.notices)   DB.notices   = byType.notices;
+    if (byType.lines)     DB.lines     = byType.lines;
+    if (byType.depts)     DB.depts     = byType.depts;
+    if (byType.templates) DB.templates = byType.templates;
+    _lastSyncTime = new Date().toISOString();
+    refreshCurrentPage();
+    updateBadge();
+  } catch(e) { console.warn('전체 동기화 오류:', e); }
+}
+
 function handleRealtimeChange(payload) {
   if (!currentUser) return;
   const { eventType, new: newRec, old: oldRec } = payload;
@@ -1873,11 +1932,13 @@ async function doLogin() {
   showPage('dashboard', null);
   updateBadge();
   initRealtime();
+  startPolling();
   showToast(`${user.name}님, 환영합니다! 👋`, 'success');
 }
 
 function doLogout() {
   if (_realtimeChannel) { sb.removeChannel(_realtimeChannel); _realtimeChannel = null; }
+  stopPolling();
   currentUser = null;
   document.getElementById('appPage').style.display = 'none';
   document.getElementById('loginPage').style.display = 'flex';
