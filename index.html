@@ -2169,19 +2169,32 @@ function renderCal(type) {
   const wrap = document.getElementById(type === 'all' ? 'calAllWrap' : 'calTeamWrap');
   if (!wrap) return;
 
-  // 팀 결정: 이미 선택된 값 → 내가 팀장인 팀 → 첫 번째 팀 순으로 fallback
-  const myHeadTeam = DB.depts.find(d => d.head === currentUser?.id)?.name || '';
-  const team = type === 'team'
-    ? (document.getElementById('calTeamSel')?.value || myHeadTeam || DB.depts[0]?.name || '')
-    : null;
-
   // 권한 체크
   const isAdmin = currentUser?.role === 'admin';
+
+  // 내가 팀장인 팀 목록
+  const myHeadDepts = DB.depts.filter(d => d.head === currentUser?.id);
+  const myHeadTeamName = myHeadDepts[0]?.name || '';
+
+  // 드롭다운에 보여줄 팀 목록
+  // - 관리자: 전체 팀
+  // - 팀장: 본인이 팀장인 팀만
+  // - 일반: 전체 팀(읽기 전용)
+  const visibleDepts = isAdmin ? DB.depts
+    : (myHeadDepts.length > 0 ? myHeadDepts : DB.depts);
+
+  // 현재 선택된 팀 결정
+  const curSelVal = document.getElementById('calTeamSel')?.value || '';
+  const curSelValid = visibleDepts.some(d => d.name === curSelVal);
+  const team = type === 'team'
+    ? (curSelValid ? curSelVal : (myHeadTeamName || visibleDepts[0]?.name || ''))
+    : null;
+
+  // canEdit: 관리자이거나 선택된 팀의 팀장
   let canEdit = false;
   if (type === 'all') {
     canEdit = isAdmin;
   } else {
-    // 팀별: 관리자 또는 해당 팀의 팀장
     const dept = DB.depts.find(d => d.name === team);
     canEdit = isAdmin || (dept && dept.head === currentUser?.id);
   }
@@ -2253,10 +2266,14 @@ function renderCal(type) {
     const permLabel = canEdit
       ? `<span style="font-size:11px;color:var(--success);white-space:nowrap">✏️ ${headName} (작성 가능)</span>`
       : `<span style="font-size:11px;color:var(--text-muted);white-space:nowrap">👁 팀장: ${headName}</span>`;
+    // visibleDepts: 관리자=전체, 팀장=본인 팀만, 일반=전체(읽기전용)
+    const opts = visibleDepts.map(d =>
+      `<option value="${d.name}"${d.name === team ? ' selected' : ''}>${d.name}</option>`
+    ).join('');
     return `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
       <select class="cal-team-sel" id="calTeamSel" onchange="renderCal('team')" style="margin-bottom:0;flex:1">
-        ${DB.depts.map(d => `<option value="${d.name}"${d.name === team ? ' selected' : ''}>${d.name}</option>`).join('')}
+        ${opts}
       </select>
       ${permLabel}
     </div>`;
