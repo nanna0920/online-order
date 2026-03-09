@@ -426,6 +426,20 @@ canvas#sigCanvas { display:block; cursor:crosshair; touch-action:none; }
 .cal-nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
 .cal-nav-btn { background:none; border:1px solid var(--border); border-radius:var(--radius-sm); width:26px; height:26px; cursor:pointer; font-size:15px; display:flex; align-items:center; justify-content:center; color:var(--text-sub); transition:all .15s; line-height:1; }
 .cal-nav-btn:hover { background:var(--primary); color:#fff; border-color:var(--primary); }
+/* 문서 양식 선택 버튼 */
+.doc-form-select-btn { display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px 12px;border:2px solid var(--border);border-radius:var(--radius);background:var(--surface);cursor:pointer;transition:.18s;width:100%; }
+.doc-form-select-btn:hover { border-color:var(--primary);background:rgba(var(--primary-rgb,.38,.64,.92),.06);transform:translateY(-2px);box-shadow:var(--shadow); }
+.doc-form-select-name { font-size:15px;font-weight:700;color:var(--text); }
+.doc-form-select-desc { font-size:11px;color:var(--text-sub);text-align:center; }
+/* 기안 서식 테이블 */
+.form-table { width:100%;border-collapse:collapse;margin-top:12px;font-size:13px; }
+.form-table th,.form-table td { border:1px solid #b0b8c1;padding:7px 10px; }
+.form-table th { background:#f0f4f8;font-weight:600;color:var(--text-sub);white-space:nowrap;width:120px; }
+.form-table td { background:#fff;min-width:160px; }
+.form-table td[contenteditable="true"] { outline:none; }
+.form-table td[contenteditable="true"]:focus { background:#fafcff; }
+.form-title { font-size:20px;font-weight:700;text-align:center;padding:14px 0 10px;letter-spacing:2px; }
+.form-sub { font-size:12px;color:var(--text-sub);text-align:right;margin-bottom:6px; }
 .cal-title { font-weight:700; font-size:14px; color:var(--primary); }
 .cal-team-sel { width:100%; padding:6px 10px; border:1.5px solid var(--border); border-radius:var(--radius-sm); font-size:12px; font-family:inherit; color:var(--text); background:var(--surface); outline:none; margin-bottom:8px; cursor:pointer; }
 .cal-team-sel:focus { border-color:var(--primary); }
@@ -748,9 +762,9 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
           <div class="doc-meta-item">
             <label>문서 종류</label>
             <select id="docType">
-              <option>업무보고</option><option>지출결의서</option><option>휴가신청서</option>
-              <option>외출 및 조퇴신청서</option><option>교육신청서</option>
-              <option>근무변경신청서</option>
+              <option>업무보고</option><option>지출결의서</option>
+              <option>휴가신청서</option><option>외출신청서</option>
+              <option>교육신청서</option><option>근무변경신청서</option>
               <option>물품구매요청서</option><option>출장신청서</option><option>인사관련</option>
               <option>시설관리</option><option>기타</option>
             </select>
@@ -1234,6 +1248,41 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
 </div><!-- end appPage -->
 
 <!-- ===== MODALS ===== -->
+
+<!-- 문서 양식 선택 모달 -->
+<div class="modal-overlay" id="docFormSelectModal">
+  <div class="modal" style="max-width:520px;width:96%">
+    <div class="modal-header">
+      <h3>📋 문서 양식 선택</h3>
+      <button class="modal-close" onclick="closeModal('docFormSelectModal')">×</button>
+    </div>
+    <div class="modal-body" style="padding:24px">
+      <p style="font-size:13px;color:var(--text-sub);margin-bottom:20px">작성할 문서 양식을 선택하세요.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <button class="doc-form-select-btn" onclick="selectDocForm('휴가신청서')">
+          <span style="font-size:28px">🏖️</span>
+          <span class="doc-form-select-name">휴가신청서</span>
+          <span class="doc-form-select-desc">연차·병가·경조사 등 휴가 신청</span>
+        </button>
+        <button class="doc-form-select-btn" onclick="selectDocForm('외출신청서')">
+          <span style="font-size:28px">🚶</span>
+          <span class="doc-form-select-name">외출신청서</span>
+          <span class="doc-form-select-desc">업무 외출·조퇴 신청</span>
+        </button>
+        <button class="doc-form-select-btn" onclick="selectDocForm('교육신청서')">
+          <span style="font-size:28px">📚</span>
+          <span class="doc-form-select-name">교육신청서</span>
+          <span class="doc-form-select-desc">외부 교육·연수 참가 신청</span>
+        </button>
+        <button class="doc-form-select-btn" onclick="selectDocForm('근무변경신청서')">
+          <span style="font-size:28px">🔄</span>
+          <span class="doc-form-select-name">근무변경신청서</span>
+          <span class="doc-form-select-desc">근무 일정·시간 변경 신청</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- 달력 에디터 모달 -->
 <div class="modal-overlay" id="calEditorModal">
@@ -2123,6 +2172,7 @@ function showPage(name, navEl) {
 
   // load content
   if (name==='dashboard') loadDashboard();
+  if (name==='writeDoc') { if (!editingDocId) openDocFormSelect(); }
   if (name==='myDocs') loadMyDocs();
   if (name==='approvalBox') loadApprovalBox();
   if (name==='approvalLine') loadLines();
@@ -2833,7 +2883,98 @@ function clearDocForm() {
   selectedApprovers=[];
   renderDocApprovalLine();
   _setWriteDocHeader(false);
-  showToast('초기화되었습니다.','success');
+  openDocFormSelect();
+}
+
+// ============================================================
+// 문서 양식 선택
+// ============================================================
+function openDocFormSelect() {
+  openModal('docFormSelectModal');
+}
+
+function selectDocForm(formName) {
+  closeModal('docFormSelectModal');
+  // 제목 자동 입력
+  document.getElementById('docTitle').value = formName;
+  // 문서 종류 select 동기화
+  const sel = document.getElementById('docType');
+  for (let i = 0; i < sel.options.length; i++) {
+    if (sel.options[i].text === formName || sel.options[i].value === formName) {
+      sel.selectedIndex = i; break;
+    }
+  }
+  // 서식 내용 삽입
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}년 ${today.getMonth()+1}월 ${today.getDate()}일`;
+  const u = currentUser || {};
+  const dept = u.dept || '';
+  const pos  = u.pos  || '';
+  const name = u.name || '';
+
+  const templates = {
+    '휴가신청서': `
+<div class="form-title">휴가신청서</div>
+<div class="form-sub">작성일 : ${todayStr}</div>
+<table class="form-table">
+  <tr><th>소속 부서</th><td>${dept}</td><th>직위</th><td>${pos}</td></tr>
+  <tr><th>성 명</th><td>${name}</td><th>연락처</th><td></td></tr>
+  <tr><th>휴가 종류</th><td colspan="3">
+    □ 연차&nbsp;&nbsp; □ 병가&nbsp;&nbsp; □ 경조사&nbsp;&nbsp; □ 공가&nbsp;&nbsp; □ 기타( )
+  </td></tr>
+  <tr><th>휴가 기간</th><td colspan="3">&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;일 ~&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;일 ( 총&nbsp;&nbsp;&nbsp;일)</td></tr>
+  <tr><th>휴가 사유</th><td colspan="3" style="height:60px"></td></tr>
+  <tr><th>비고</th><td colspan="3"></td></tr>
+</table>
+<p style="margin-top:16px;font-size:13px;color:#555;">위와 같이 휴가를 신청합니다.</p>`,
+
+    '외출신청서': `
+<div class="form-title">외출신청서</div>
+<div class="form-sub">작성일 : ${todayStr}</div>
+<table class="form-table">
+  <tr><th>소속 부서</th><td>${dept}</td><th>직위</th><td>${pos}</td></tr>
+  <tr><th>성 명</th><td>${name}</td><th>연락처</th><td></td></tr>
+  <tr><th>외출 종류</th><td colspan="3">□ 외출&nbsp;&nbsp; □ 조퇴&nbsp;&nbsp; □ 기타( )</td></tr>
+  <tr><th>외출 일시</th><td colspan="3">&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;일&nbsp;&nbsp;&nbsp;시&nbsp;&nbsp;&nbsp;분 ~&nbsp;&nbsp;&nbsp;시&nbsp;&nbsp;&nbsp;분</td></tr>
+  <tr><th>행선지</th><td colspan="3"></td></tr>
+  <tr><th>외출 목적</th><td colspan="3" style="height:60px"></td></tr>
+  <tr><th>비고</th><td colspan="3"></td></tr>
+</table>
+<p style="margin-top:16px;font-size:13px;color:#555;">위와 같이 외출을 신청합니다.</p>`,
+
+    '교육신청서': `
+<div class="form-title">교육신청서</div>
+<div class="form-sub">작성일 : ${todayStr}</div>
+<table class="form-table">
+  <tr><th>소속 부서</th><td>${dept}</td><th>직위</th><td>${pos}</td></tr>
+  <tr><th>성 명</th><td>${name}</td><th>연락처</th><td></td></tr>
+  <tr><th>교육명</th><td colspan="3"></td></tr>
+  <tr><th>교육 기간</th><td colspan="3">&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;일 ~&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;일 ( 총&nbsp;&nbsp;&nbsp;일)</td></tr>
+  <tr><th>교육 장소</th><td colspan="3"></td></tr>
+  <tr><th>주관 기관</th><td colspan="3"></td></tr>
+  <tr><th>교육 비용</th><td colspan="3">원 (□ 전액 회사 부담&nbsp;&nbsp; □ 일부 자부담&nbsp;&nbsp; □ 자비)</td></tr>
+  <tr><th>교육 목적</th><td colspan="3" style="height:60px"></td></tr>
+  <tr><th>비고</th><td colspan="3"></td></tr>
+</table>
+<p style="margin-top:16px;font-size:13px;color:#555;">위와 같이 교육 참가를 신청합니다.</p>`,
+
+    '근무변경신청서': `
+<div class="form-title">근무변경신청서</div>
+<div class="form-sub">작성일 : ${todayStr}</div>
+<table class="form-table">
+  <tr><th>소속 부서</th><td>${dept}</td><th>직위</th><td>${pos}</td></tr>
+  <tr><th>성 명</th><td>${name}</td><th>연락처</th><td></td></tr>
+  <tr><th>변경 대상일</th><td colspan="3">&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;일 (&nbsp;&nbsp;&nbsp;요일)</td></tr>
+  <tr><th>현재 근무</th><td colspan="3"></td></tr>
+  <tr><th>변경 희망</th><td colspan="3"></td></tr>
+  <tr><th>변경 사유</th><td colspan="3" style="height:60px"></td></tr>
+  <tr><th>비고</th><td colspan="3"></td></tr>
+</table>
+<p style="margin-top:16px;font-size:13px;color:#555;">위와 같이 근무 변경을 신청합니다.</p>`
+  };
+
+  const html = templates[formName] || '';
+  document.getElementById('docContent').innerHTML = html;
 }
 
 function _setWriteDocHeader(isEdit) {
