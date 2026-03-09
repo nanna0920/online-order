@@ -311,7 +311,7 @@ canvas#sigCanvas { display:block; cursor:crosshair; touch-action:none; }
   #printModalArea .pd-meta-table td.lbl { background:#f0f4f8 !important; print-color-adjust:exact; -webkit-print-color-adjust:exact; }
   #printModalArea .pd-divider-top { border-top:3px solid #1a3a5c !important; display:block !important; }
   #printModalArea .pd-divider-bot { border-top:1px solid #1a3a5c !important; display:block !important; }
-  #printModalArea .pd-body-content { border:1.5px solid #333 !important; }
+  #printModalArea .pd-body-content { border:none !important; }
   #printModalArea .pd-opinion-item { border:1px solid #999 !important; }
   #printModalArea hr { display:block !important; }
 }
@@ -3377,9 +3377,6 @@ function printDoc(docId) {
   }).join('');
 
   const printHtml = `
-    <div class="pd-title">${doc.title}</div>
-    <hr class="pd-divider-top">
-
     <div class="pd-approval-wrap">
       <table class="pd-approval-table">
         <tr><th class="ap-row-label" rowspan="2" style="vertical-align:middle;font-size:13px;letter-spacing:2px;padding:6px 10px">결<br>재</th>${approverHeaders}</tr>
@@ -3389,8 +3386,7 @@ function printDoc(docId) {
     </div>
     <hr class="pd-divider-bot">
 
-    <div class="pd-body-label">▶ 내 용</div>
-    <div class="pd-body-content">${renderDocContent(doc.content)}</div>
+    <div style="padding:16px 0;font-size:13px;line-height:1.8">${renderDocContent(doc.content)}</div>
 
     <div style="margin-top:40px;text-align:center;font-size:25px;font-weight:700;letter-spacing:4px">${companyName} 귀하</div>
 
