@@ -422,6 +422,32 @@ canvas#sigCanvas { display:block; cursor:crosshair; touch-action:none; }
 .toast.error { background:var(--danger); }
 @keyframes slideIn { from{transform:translateX(100%);opacity:0} to{transform:translateX(0);opacity:1} }
 
+/* CALENDAR MEMO */
+.cal-nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.cal-nav-btn { background:none; border:1px solid var(--border); border-radius:var(--radius-sm); width:26px; height:26px; cursor:pointer; font-size:15px; display:flex; align-items:center; justify-content:center; color:var(--text-sub); transition:all .15s; line-height:1; }
+.cal-nav-btn:hover { background:var(--primary); color:#fff; border-color:var(--primary); }
+.cal-title { font-weight:700; font-size:14px; color:var(--primary); }
+.cal-team-sel { width:100%; padding:6px 10px; border:1.5px solid var(--border); border-radius:var(--radius-sm); font-size:12px; font-family:inherit; color:var(--text); background:var(--surface); outline:none; margin-bottom:10px; cursor:pointer; }
+.cal-team-sel:focus { border-color:var(--primary); }
+.cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
+.cal-dow { text-align:center; font-size:10px; font-weight:700; color:var(--text-muted); padding:3px 0; }
+.cal-dow.sun { color:#e74c3c; } .cal-dow.sat { color:#3498db; }
+.cal-day { position:relative; min-height:30px; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:3px 1px; border-radius:5px; cursor:pointer; transition:background .15s; border:1.5px solid transparent; font-size:11px; font-weight:400; gap:1px; }
+.cal-day:hover { background:rgba(26,58,92,0.07); }
+.cal-day.today { background:var(--primary); color:#fff !important; font-weight:700; }
+.cal-day.today:hover { background:var(--primary-light); }
+.cal-day.today .cal-dot { background:rgba(255,255,255,0.85); }
+.cal-day.selected { border-color:var(--accent); background:rgba(200,151,58,0.09); }
+.cal-day.other-month { color:var(--border); pointer-events:none; }
+.cal-day.sun-col { color:#e74c3c; } .cal-day.sat-col { color:#3498db; }
+.cal-day.today.sun-col, .cal-day.today.sat-col { color:#fff !important; }
+.cal-dot { width:5px; height:5px; border-radius:50%; background:var(--accent); flex-shrink:0; }
+.cal-memo-area { margin-top:12px; border-top:1px solid var(--border); padding-top:10px; }
+.cal-memo-date-lbl { font-size:11px; font-weight:700; color:var(--primary); margin-bottom:6px; }
+.cal-memo-ta { width:100%; padding:8px 10px; border:1.5px solid var(--border); border-radius:var(--radius-sm); font-size:12px; font-family:inherit; resize:vertical; min-height:64px; outline:none; transition:border-color .2s; line-height:1.5; }
+.cal-memo-ta:focus { border-color:var(--primary); box-shadow:0 0 0 3px rgba(26,58,92,0.07); }
+.cal-memo-btns { display:flex; gap:6px; margin-top:6px; justify-content:flex-end; }
+
 /* DASHBOARD QUICK */
 .quick-actions { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px; margin-bottom:24px; }
 .quick-action { background:var(--surface); border:1.5px solid var(--border); border-radius:var(--radius); padding:18px 14px; text-align:center; cursor:pointer; transition:all .2s; }
@@ -625,6 +651,21 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
 
     <!-- ===== DASHBOARD ===== -->
     <div class="page active" id="page-dashboard">
+      <!-- 달력 메모 패널 (맨 위 첫 번째 행) -->
+      <div class="grid-2" style="margin-bottom:20px">
+        <div class="card">
+          <div class="card-header"><h3>📅 전체 공지 메모</h3><span style="font-size:11px;color:var(--text-muted)">날짜를 클릭해 메모를 남기세요</span></div>
+          <div class="card-body" style="padding:16px">
+            <div id="calAllWrap"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>📅 팀별 공지 메모</h3><span style="font-size:11px;color:var(--text-muted)">팀을 선택한 뒤 날짜를 클릭하세요</span></div>
+          <div class="card-body" style="padding:16px">
+            <div id="calTeamWrap"></div>
+          </div>
+        </div>
+      </div>
       <div class="quick-actions">
         <div class="quick-action" onclick="showPage('writeDoc',null)">
           <div class="qa-icon">✍️</div><span>문서 기안</span>
@@ -1597,6 +1638,8 @@ function sbId(type, itemId) {
   if (type === 'lines') return 'line-' + itemId;
   if (type === 'depts') return 'dept-' + itemId;
   if (type === 'settings') return 'settings-' + itemId;
+  if (type === 'memoAll')  return 'memoAll-'  + itemId;
+  if (type === 'memoTeam') return 'memoTeam-' + itemId;
   return String(itemId); // docs, templates
 }
 
@@ -1636,6 +1679,8 @@ async function loadFromSupabase() {
       if (byType.depts && byType.depts.length)     DB.depts     = byType.depts;
       if (byType.templates && byType.templates.length) DB.templates = byType.templates;
       if (byType.settings && byType.settings.length) DB.settings = byType.settings[0];
+      if (byType.memoAll)  DB.memoAll  = byType.memoAll;
+      if (byType.memoTeam) DB.memoTeam = byType.memoTeam;
     } else {
       // 최초 실행: 기본 데이터를 Supabase에 저장
       await seedSupabase();
@@ -1728,6 +1773,8 @@ async function fullSyncSupabase() {
     if (byType.depts)     DB.depts     = byType.depts;
     if (byType.templates) DB.templates = byType.templates;
     if (byType.settings && byType.settings.length) DB.settings = byType.settings[0];
+    if (byType.memoAll)  DB.memoAll  = byType.memoAll;
+    if (byType.memoTeam) DB.memoTeam = byType.memoTeam;
     _lastSyncTime = new Date().toISOString();
     refreshCurrentPage();
     updateBadge();
@@ -1815,6 +1862,12 @@ function applyDBChange(type, data) {
     if (idx > -1) DB.templates[idx] = data; else DB.templates.push(data);
   } else if (type === 'settings') {
     DB.settings = data;
+  } else if (type === 'memoAll') {
+    const idx = DB.memoAll.findIndex(m => m.id === data.id);
+    if (idx > -1) DB.memoAll[idx] = data; else DB.memoAll.push(data);
+  } else if (type === 'memoTeam') {
+    const idx = DB.memoTeam.findIndex(m => m.id === data.id);
+    if (idx > -1) DB.memoTeam[idx] = data; else DB.memoTeam.push(data);
   }
 }
 
@@ -1823,7 +1876,9 @@ function applyDBDelete(rowId) {
   else if (rowId.startsWith('notice-')) DB.notices = DB.notices.filter(n => 'notice-'+n.id !== rowId);
   else if (rowId.startsWith('line-'))   DB.lines   = DB.lines.filter(l => 'line-'+l.id !== rowId);
   else if (rowId.startsWith('dept-'))   DB.depts   = DB.depts.filter(d => 'dept-'+d.name !== rowId);
-  else if (rowId.startsWith('TPL-'))    DB.templates = DB.templates.filter(t => t.id !== rowId);
+  else if (rowId.startsWith('TPL-'))      DB.templates = DB.templates.filter(t => t.id !== rowId);
+  else if (rowId.startsWith('memoAll-'))  DB.memoAll   = DB.memoAll.filter(m => 'memoAll-'+m.id  !== rowId);
+  else if (rowId.startsWith('memoTeam-')) DB.memoTeam  = DB.memoTeam.filter(m => 'memoTeam-'+m.id !== rowId);
   else DB.docs = DB.docs.filter(d => d.id !== rowId); // docs
 }
 
@@ -1880,6 +1935,8 @@ const DB = {
     {name:'영양팀', code:'FOOD', head:''},
   ],
   templates: [],  // 서식 항목: {id, name, docType, content, updatedAt}
+  memoAll:  [],   // 전체 공지 달력 메모: {id, date:'YYYY-MM-DD', content, author}
+  memoTeam: [],   // 팀별 달력 메모: {id, date:'YYYY-MM-DD', content, team, author}
   settings: {     // 회사 정보
     companyName: '주식회사 케어플러스',
     ceo: '김대표',
@@ -2031,7 +2088,139 @@ function updateBadge() {
 // ============================================================
 // DASHBOARD
 // ============================================================
+// ============================================================
+// CALENDAR MEMO
+// ============================================================
+const _calState = {
+  all:  { year: new Date().getFullYear(), month: new Date().getMonth(), selDate: null },
+  team: { year: new Date().getFullYear(), month: new Date().getMonth(), selDate: null }
+};
+const _MONTH_NAMES = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+
+function renderCal(type) {
+  const s = _calState[type];
+  const wrap = document.getElementById(type === 'all' ? 'calAllWrap' : 'calTeamWrap');
+  if (!wrap) return;
+
+  const team = type === 'team' ? (document.getElementById('calTeamSel')?.value || (DB.depts[0]?.name || '')) : null;
+  const today = new Date();
+  const y = s.year, mo = s.month;
+  const firstDow = new Date(y, mo, 1).getDay();
+  const daysInMo  = new Date(y, mo + 1, 0).getDate();
+  const monthPfx  = `${y}-${String(mo + 1).padStart(2, '0')}`;
+
+  const memos = (type === 'all' ? DB.memoAll : DB.memoTeam.filter(m => m.team === team))
+                  .filter(m => m.date.startsWith(monthPfx));
+  const memoDates = new Set(memos.map(m => m.date));
+
+  // 날짜 셀 생성
+  let cells = '';
+  for (let i = 0; i < firstDow; i++) cells += '<div class="cal-day other-month"></div>';
+  for (let d = 1; d <= daysInMo; d++) {
+    const ds  = `${monthPfx}-${String(d).padStart(2, '0')}`;
+    const dow = (firstDow + d - 1) % 7;
+    const cls = [
+      'cal-day',
+      (d === today.getDate() && mo === today.getMonth() && y === today.getFullYear()) ? 'today' : '',
+      memoDates.has(ds) ? 'has-memo' : '',
+      s.selDate === ds ? 'selected' : '',
+      dow === 0 ? 'sun-col' : (dow === 6 ? 'sat-col' : '')
+    ].filter(Boolean).join(' ');
+    cells += `<div class="${cls}" onclick="calSelectDay('${type}','${ds}')">${d}${memoDates.has(ds) ? '<div class="cal-dot"></div>' : ''}</div>`;
+  }
+
+  // 메모 편집 영역
+  let memoArea = '';
+  if (s.selDate) {
+    const existing = (type === 'all' ? DB.memoAll : DB.memoTeam.filter(m => m.team === team))
+                       .find(m => m.date === s.selDate);
+    const tparam = type === 'team' ? `,\`${team}\`` : '';
+    memoArea = `
+      <div class="cal-memo-area">
+        <div class="cal-memo-date-lbl">📝 ${s.selDate}</div>
+        <textarea class="cal-memo-ta" id="calMemoTa_${type}" placeholder="메모를 입력하세요...">${existing ? existing.content.replace(/</g,'&lt;') : ''}</textarea>
+        <div class="cal-memo-btns">
+          ${existing ? `<button class="btn btn-sm btn-danger" onclick="calDeleteMemo('${type}','${s.selDate}'${tparam})">🗑️ 삭제</button>` : ''}
+          <button class="btn btn-sm btn-primary" onclick="calSaveMemo('${type}','${s.selDate}'${tparam})">💾 저장</button>
+        </div>
+      </div>`;
+  }
+
+  // 팀 선택기 (team 타입만)
+  const teamSel = type === 'team' ? `
+    <select class="cal-team-sel" id="calTeamSel" onchange="renderCal('team')">
+      ${DB.depts.map(d => `<option value="${d.name}"${d.name === team ? ' selected' : ''}>${d.name}</option>`).join('')}
+    </select>` : '';
+
+  wrap.innerHTML = `
+    ${teamSel}
+    <div class="cal-nav">
+      <button class="cal-nav-btn" onclick="calMove('${type}',-1)">&#8249;</button>
+      <span class="cal-title">${y}년 ${_MONTH_NAMES[mo]}</span>
+      <button class="cal-nav-btn" onclick="calMove('${type}',1)">&#8250;</button>
+    </div>
+    <div class="cal-grid">
+      <div class="cal-dow sun">일</div><div class="cal-dow">월</div><div class="cal-dow">화</div>
+      <div class="cal-dow">수</div><div class="cal-dow">목</div><div class="cal-dow">금</div>
+      <div class="cal-dow sat">토</div>
+      ${cells}
+    </div>
+    ${memoArea}`;
+}
+
+function calMove(type, dir) {
+  const s = _calState[type];
+  s.month += dir;
+  if (s.month < 0)  { s.month = 11; s.year--; }
+  if (s.month > 11) { s.month = 0;  s.year++; }
+  s.selDate = null;
+  renderCal(type);
+}
+
+function calSelectDay(type, ds) {
+  const s = _calState[type];
+  s.selDate = s.selDate === ds ? null : ds;
+  renderCal(type);
+}
+
+function calSaveMemo(type, ds, team) {
+  const ta = document.getElementById('calMemoTa_' + type);
+  const content = ta?.value?.trim();
+  if (!content) { showToast('메모 내용을 입력하세요.', 'warning'); return; }
+
+  const arr = type === 'all' ? DB.memoAll : DB.memoTeam;
+  const existing = arr.find(m => m.date === ds && (type === 'all' || m.team === team));
+  const sbType = type === 'all' ? 'memoAll' : 'memoTeam';
+
+  if (existing) {
+    existing.content = content;
+    sbSave(sbType, existing.id, existing);
+  } else {
+    const nm = { id: ds + (team ? '-' + team : '') + '-' + Date.now(), date: ds, content, author: currentUser.id };
+    if (team) nm.team = team;
+    arr.push(nm);
+    sbSave(sbType, nm.id, nm);
+  }
+  showToast('메모가 저장되었습니다.', 'success');
+  renderCal(type);
+}
+
+function calDeleteMemo(type, ds, team) {
+  const arr = type === 'all' ? DB.memoAll : DB.memoTeam;
+  const idx = arr.findIndex(m => m.date === ds && (type === 'all' || m.team === team));
+  if (idx === -1) return;
+  sbRemove(type === 'all' ? 'memoAll' : 'memoTeam', arr[idx].id);
+  arr.splice(idx, 1);
+  _calState[type].selDate = null;
+  showToast('메모가 삭제되었습니다.', 'info');
+  renderCal(type);
+}
+
 function loadDashboard() {
+  // 달력 메모 렌더링
+  renderCal('all');
+  renderCal('team');
+
   // Stats - 결재함 탭 기준으로 계산
   const myDocs  = DB.docs.filter(d=>d.writer===currentUser.id&&!d.draft);
   // 결재 대기 탭: 내가 결재해야 할 문서 (pending)
