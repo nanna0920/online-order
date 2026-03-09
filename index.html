@@ -2512,50 +2512,6 @@ function loadDashboard() {
   renderCal('all');
   renderCal('team');
 
-  // Stats - 결재함 탭 기준으로 계산
-  const myDocs  = DB.docs.filter(d=>d.writer===currentUser.id&&!d.draft);
-  // 결재 대기 탭: 내가 결재해야 할 문서 (pending)
-  const pending = DB.docs.filter(d=>!d.draft&&d.approvers.some(a=>a.id===currentUser.id&&a.status==='pending'));
-  // 결재 예정 탭: 내가 예정된 문서 (waiting)
-  const waiting = DB.docs.filter(d=>!d.draft&&d.approvers.some(a=>a.id===currentUser.id&&a.status==='waiting'));
-  // 처리 완료 탭: 내가 처리한 문서 (approved or rejected)
-  const done    = DB.docs.filter(d=>!d.draft&&d.approvers.some(a=>a.id===currentUser.id&&(a.status==='approved'||a.status==='rejected')));
-  // 전체 문서: 결재함에 있는 전체 (대기 + 예정 + 완료)
-  const total   = pending.length + waiting.length + done.length;
-
-  document.getElementById('statsGrid').innerHTML = `
-    <div class="stat-card" style="cursor:pointer" onclick="gotoApprovalTab('pending')" title="결재함 전체 보기"><div class="stat-icon" style="background:#e3f0fb">📋</div><div class="stat-info"><div class="num">${total}</div><div class="label">전체 문서</div></div></div>
-    <div class="stat-card" style="cursor:pointer" onclick="gotoApprovalTab('pending')" title="결재 대기 보기"><div class="stat-icon" style="background:#fff3cd">⏳</div><div class="stat-info"><div class="num">${pending.length}</div><div class="label">결재 대기</div></div></div>
-    <div class="stat-card" style="cursor:pointer" onclick="gotoApprovalTab('done')" title="결재 완료 보기"><div class="stat-icon" style="background:#d4edda">✅</div><div class="stat-info"><div class="num">${done.length}</div><div class="label">결재 완료</div></div></div>
-    <div class="stat-card" style="cursor:pointer" onclick="gotoMyDocsTab('all')" title="내 기안 문서 보기"><div class="stat-icon" style="background:#f0e6ff">📝</div><div class="stat-info"><div class="num">${myDocs.length}</div><div class="label">내 기안 문서</div></div></div>
-  `;
-
-  // Pending list
-  const pl = document.getElementById('dashPendingList');
-  if (pending.length===0) {
-    pl.innerHTML = '<div class="empty-state"><div class="icon">✅</div><p>결재 대기 문서가 없습니다.</p></div>';
-  } else {
-    pl.innerHTML = pending.slice(0,5).map(d=>`
-      <div class="notice-item" onclick="viewDoc('${d.id}')">
-        <div style="flex:1"><div class="notice-title">${d.title}</div><div class="notice-meta">${d.type} · ${d.date} · 기안: ${getUser(d.writer).name}</div></div>
-        <span class="badge badge-pending">대기</span>
-      </div>`).join('');
-  }
-
-  // My docs
-  const ml = document.getElementById('dashMyList');
-  const myRecent = DB.docs.filter(d=>d.writer===currentUser.id).slice(-5).reverse();
-  if (myRecent.length===0) {
-    ml.innerHTML = '<div class="empty-state"><div class="icon">📄</div><p>기안한 문서가 없습니다.</p></div>';
-  } else {
-    ml.innerHTML = myRecent.map(d=>`
-      <div class="notice-item">
-        <div style="flex:1;cursor:pointer" onclick="viewDoc('${d.id}')"><div class="notice-title">${d.title}</div><div class="notice-meta">${d.type} · ${d.date}</div></div>
-        ${getStatusBadge(d.status)}
-        ${d.status==='approved'?`<button class="btn btn-sm" style="background:#1a3a5c;color:#fff;margin-left:8px;flex-shrink:0" onclick="printDoc('${d.id}')">🖨️</button>`:''}
-      </div>`).join('');
-  }
-
   // Notices
   const nl = document.getElementById('dashNoticeList');
   const sortedNotices = [...DB.notices].sort((a,b) => b.pin - a.pin || b.id - a.id);
