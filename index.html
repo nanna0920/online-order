@@ -3222,25 +3222,9 @@ function viewDoc(docId) {
   const urgencyText = {normal:'일반',urgent:'긴급','very-urgent':'매우 긴급'}[doc.urgency]||'일반';
   const urgencyStyle = doc.urgency==='urgent'?'color:#e65100;font-weight:700':doc.urgency==='very-urgent'?'color:#c0392b;font-weight:700':'';
 
-  document.getElementById('modalDocTitle').textContent = '';
+  document.getElementById('modalDocTitle').textContent = doc.title;
   document.getElementById('modalDocBody').innerHTML = `
-    <div style="border:2px solid var(--border);border-radius:var(--radius);overflow:hidden">
-      <!-- 제목 바 -->
-      <div style="background:var(--primary);padding:12px 18px">
-        <div style="color:#fff;font-size:17px;font-weight:700">${doc.title}</div>
-      </div>
-      <!-- 문서 메타 그리드 -->
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1.5px solid var(--border)">
-        <div style="padding:9px 14px;border-right:1px solid var(--border)"><div style="font-size:10px;color:var(--text-sub);font-weight:700;margin-bottom:2px;letter-spacing:.5px">문서 종류</div><div style="font-size:13px">${doc.type}</div></div>
-        <div style="padding:9px 14px;border-right:1px solid var(--border)"><div style="font-size:10px;color:var(--text-sub);font-weight:700;margin-bottom:2px;letter-spacing:.5px">기안자</div><div style="font-size:13px">${getUser(doc.writer).name} (${getUser(doc.writer).pos})</div></div>
-        <div style="padding:9px 14px"><div style="font-size:10px;color:var(--text-sub);font-weight:700;margin-bottom:2px;letter-spacing:.5px">기안일</div><div style="font-size:13px">${doc.date}</div></div>
-        <div style="padding:9px 14px;border-top:1px solid var(--border);border-right:1px solid var(--border)"><div style="font-size:10px;color:var(--text-sub);font-weight:700;margin-bottom:2px;letter-spacing:.5px">부서</div><div style="font-size:13px">${doc.dept}</div></div>
-        <div style="padding:9px 14px;border-top:1px solid var(--border);border-right:1px solid var(--border)"><div style="font-size:10px;color:var(--text-sub);font-weight:700;margin-bottom:2px;letter-spacing:.5px">긴급도</div><div style="font-size:13px;${urgencyStyle}">${urgencyText}</div></div>
-        <div style="padding:9px 14px;border-top:1px solid var(--border)"><div style="font-size:10px;color:var(--text-sub);font-weight:700;margin-bottom:2px;letter-spacing:.5px">상태</div><div style="font-size:13px">${getStatusBadge(doc.status)}</div></div>
-        <div style="padding:9px 14px;border-top:1px solid var(--border);border-right:1px solid var(--border)"><div style="font-size:10px;color:var(--text-sub);font-weight:700;margin-bottom:2px;letter-spacing:.5px">문서번호</div><div style="font-size:12px;color:var(--text-sub)">${doc.id}</div></div>
-        <div style="padding:9px 14px;border-top:1px solid var(--border);border-right:1px solid var(--border)"><div style="font-size:10px;color:var(--text-sub);font-weight:700;margin-bottom:2px;letter-spacing:.5px">보존기간</div><div style="font-size:13px">${doc.retention||'-'}</div></div>
-        <div style="padding:9px 14px;border-top:1px solid var(--border)"><div style="font-size:10px;color:var(--text-sub);font-weight:700;margin-bottom:2px;letter-spacing:.5px">열람</div><div style="font-size:12px;color:var(--text-muted)">본인 · 결재자</div></div>
-      </div>
+    <div style="border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden">
       <!-- 결재라인 -->
       <div style="padding:12px 16px;border-bottom:1.5px solid var(--border);background:var(--surface2)">
         <div style="font-size:11px;font-weight:700;color:var(--text-sub);margin-bottom:8px;letter-spacing:.5px">🔗 결재라인</div>
@@ -3253,14 +3237,13 @@ function viewDoc(docId) {
               <div class="name">${a.name} ${a.pos}</div>
               <div class="status">${a.status==='approved'?'✅ 결재':a.status==='rejected'?'❌ 반려':a.status==='pending'?'⏳ 대기중':'⬜ 예정'}</div>
               ${a.date?`<div style="font-size:10px;color:var(--text-muted);margin-top:2px">${a.date}</div>`:''}
-              ${a.opinion?`<div style="font-size:10px;color:var(--text-sub);margin-top:3px;font-style:italic">"${a.opinion}"</div>`:''}
+              ${a.opinion?`<div style="font-size:10px;color:var(--text-sub);margin-top:3px;font-style:italic">\${a.opinion}\</div>`:''}
             </div>`).join('')}
         </div>
       </div>
       <!-- 문서 내용 -->
       <div style="padding:18px 20px;border-bottom:${isApprover?'1.5px solid var(--border)':'none'}">
-        <div style="font-size:11px;font-weight:700;color:var(--text-sub);margin-bottom:10px;letter-spacing:.5px">📄 문서 내용</div>
-        <div class="doc-view-content" style="font-size:13px;line-height:1.85;min-height:120px;white-space:pre-wrap">${renderDocContent(doc.content)}</div>
+        <div class="doc-view-content" style="font-size:13px;line-height:1.85;min-height:120px">${renderDocContent(doc.content)}</div>
       </div>
       <!-- 결재 의견 입력 (결재자만) -->
       ${isApprover ? `
@@ -3271,26 +3254,7 @@ function viewDoc(docId) {
     </div>
   `;
 
-  const footer = document.getElementById('modalDocFooter');
-  if (isApprover) {
-    footer.innerHTML = `
-      <button class="btn btn-secondary" onclick="closeModal('docViewModal')">닫기</button>
-      <button class="btn btn-danger" onclick="processApproval('${doc.id}','rejected')">❌ 반려</button>
-      <button class="btn btn-success" onclick="processApproval('${doc.id}','approved')">✅ 결재승인</button>
-    `;
-  } else {
-    const isWriter = doc.writer === currentUser.id;
-    const isAdmin  = currentUser.role === 'admin';
-    footer.innerHTML = `
-      <button class="btn btn-secondary" onclick="closeModal('docViewModal')">닫기</button>
-      ${isAdmin?`<button class="btn btn-outline" onclick="openAdminDocEdit('${doc.id}')">🔧 메타정보 수정</button>`:''}
-      ${(isWriter&&doc.status==='draft')||isAdmin?`<button class="btn btn-primary" onclick="editDoc('${doc.id}')">✏️ 내용 수정</button>`:''}
-      ${(isWriter&&doc.status==='draft')||isAdmin?`<button class="btn btn-danger" onclick="deleteDoc('${doc.id}')">🗑️ 삭제</button>`:''}
-      ${doc.status==='approved'||doc.status==='rejected'?`<button class="btn btn-primary" style="background:#1a3a5c" onclick="closeModal('docViewModal');printDoc('${doc.id}')">🖨️ 프린트 출력</button>`:''}
-    `;
-  }
-
-  openModal('docViewModal');
+    openModal('docViewModal');
 }
 
 function processApproval(docId, action) {
@@ -3410,11 +3374,8 @@ function printDoc(docId) {
   }).join('');
 
   const printHtml = `
-    <div class="pd-company">${companyName}</div>
     <div class="pd-title">${doc.title}</div>
     <hr class="pd-divider-top">
-    <div class="pd-docno">문서번호: ${doc.id} &nbsp;|&nbsp; 상태: ${statusText}</div>
-    <hr class="pd-divider-bot">
 
     <div class="pd-approval-wrap">
       <table class="pd-approval-table">
@@ -3423,35 +3384,12 @@ function printDoc(docId) {
       </table>
       <div class="pd-clearfix"></div>
     </div>
-
-    <table class="pd-meta-table">
-      <tr>
-        <td class="lbl">기 안 자</td><td>${writer.name} (${writer.pos})</td>
-        <td class="lbl">소속부서</td><td>${doc.dept}</td>
-      </tr>
-      <tr>
-        <td class="lbl">기 안 일</td><td>${doc.date}</td>
-        <td class="lbl">문서종류</td><td>${doc.type}</td>
-      </tr>
-      <tr>
-        <td class="lbl">보존기간</td><td>${doc.retention}</td>
-        <td class="lbl">긴 급 도</td><td>${urgencyText}</td>
-      </tr>
-    </table>
+    <hr class="pd-divider-bot">
 
     <div class="pd-body-label">▶ 내 용</div>
     <div class="pd-body-content">${renderDocContent(doc.content)}</div>
 
-    ${opinions.length > 0 ? `
-    <div class="pd-opinions">
-      <div class="pd-body-label" style="margin-top:14px">▶ 결재 의견</div>
-      ${opinions.map(a=>`
-        <div class="pd-opinion-item">
-          <div class="oi-name">${a.name} (${a.pos}) — ${a.status==='approved'?'✅ 결재':'❌ 반려'} ${a.date||''}</div>
-          <div class="oi-text">${a.opinion}</div>
-        </div>`).join('')}
-    </div>` : ''}
-
+    <div style="margin-top:40px;text-align:center;font-size:25px;font-weight:700;letter-spacing:4px">${companyName} 귀하</div>
 
   `;
 
