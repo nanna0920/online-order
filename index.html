@@ -2173,6 +2173,7 @@ function renderCal(type) {
   const isAdmin = currentUser?.role === 'admin';
   const uid = currentUser?.id || '';
   const myDeptName = currentUser?.dept || ''; // 내 소속 팀명
+  const isStaff = currentUser?.pos === '사원'; // 사원은 조회만 가능
 
   // 드롭다운: 관리자=전체, 일반=본인 소속 팀만
   const visibleDepts = isAdmin
@@ -2190,15 +2191,18 @@ function renderCal(type) {
   // 1) 관리자
   // 2) 해당 팀 지정 팀장 (dept.head === uid)
   // 3) head 미지정 팀이고 본인이 그 팀 소속
+  // * 사원은 항상 읽기 전용
   let canEdit = false;
-  if (type === 'all') {
-    canEdit = isAdmin;
-  } else {
-    const dept = DB.depts.find(d => d.name === team);
-    const isDesignatedHead = dept && String(dept.head) === String(uid);
-    const isHeadUnset = dept && (!dept.head || dept.head === '');
-    const isMember = myDeptName === team;
-    canEdit = isAdmin || isDesignatedHead || (isHeadUnset && isMember);
+  if (!isStaff) {
+    if (type === 'all') {
+      canEdit = isAdmin;
+    } else {
+      const dept = DB.depts.find(d => d.name === team);
+      const isDesignatedHead = dept && String(dept.head) === String(uid);
+      const isHeadUnset = dept && (!dept.head || dept.head === '');
+      const isMember = myDeptName === team;
+      canEdit = isAdmin || isDesignatedHead || (isHeadUnset && isMember);
+    }
   }
   const readonlyAttr = canEdit ? '' : 'readonly';
   const taStyle = canEdit ? '' : 'cursor:default;color:var(--text-sub);';
@@ -2437,6 +2441,8 @@ function calSaveEditor() {
   const isAdmin = currentUser?.role === 'admin';
   const uid = currentUser?.id || '';
   const myDeptName = currentUser?.dept || '';
+  const isStaff = currentUser?.pos === '사원';
+  if (isStaff) { showToast('사원은 조회만 가능합니다.', 'error'); return; }
   if (type === 'all' && !isAdmin) { showToast('관리자만 저장할 수 있습니다.', 'error'); return; }
   if (type === 'team') {
     const dept = DB.depts.find(d => d.name === team);
