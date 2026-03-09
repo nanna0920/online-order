@@ -2797,12 +2797,15 @@ function openDocFormSelect() {
 }
 
 function toggleFormChk(el) {
+  const isChecked = el.classList.contains('checked');
+  // 같은 셀의 다른 항목 모두 해제
   const td = el.closest('td');
-  if (td) {
-    td.querySelectorAll('.form-chk').forEach(c => { c.classList.remove('checked'); c.textContent = ''; });
+  if (td) td.querySelectorAll('.form-chk').forEach(c => { c.classList.remove('checked'); c.textContent = ''; });
+  // 이미 선택된 항목 클릭 시 해제(토글), 아니면 선택
+  if (!isChecked) {
+    el.classList.add('checked');
+    el.textContent = 'V';
   }
-  el.classList.add('checked');
-  el.textContent = 'V';
 }
 
 function _setDocFormMode(formName) {
