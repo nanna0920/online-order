@@ -426,11 +426,19 @@ canvas#sigCanvas { display:block; cursor:crosshair; touch-action:none; }
 .cal-nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
 .cal-nav-btn { background:none; border:1px solid var(--border); border-radius:var(--radius-sm); width:26px; height:26px; cursor:pointer; font-size:15px; display:flex; align-items:center; justify-content:center; color:var(--text-sub); transition:all .15s; line-height:1; }
 .cal-nav-btn:hover { background:var(--primary); color:#fff; border-color:var(--primary); }
-/* 문서 양식 선택 버튼 */
+/* 문서 양식 선택 버튼 (모달용) */
 .doc-form-select-btn { display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px 12px;border:2px solid var(--border);border-radius:var(--radius);background:var(--surface);cursor:pointer;transition:.18s;width:100%; }
 .doc-form-select-btn:hover { border-color:var(--primary);background:rgba(var(--primary-rgb,.38,.64,.92),.06);transform:translateY(-2px);box-shadow:var(--shadow); }
 .doc-form-select-name { font-size:15px;font-weight:700;color:var(--text); }
 .doc-form-select-desc { font-size:11px;color:var(--text-sub);text-align:center; }
+/* 문서 기안 페이지 내 아이콘 카드 */
+.doc-form-icon-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:20px;max-width:800px;margin:0 auto;padding:0 16px 40px; }
+@media(max-width:640px){ .doc-form-icon-grid { grid-template-columns:repeat(2,1fr); } }
+.doc-form-icon-card { display:flex;flex-direction:column;align-items:center;gap:10px;padding:32px 16px;border:2px solid var(--border);border-radius:var(--radius);background:var(--surface);cursor:pointer;transition:.2s;width:100%;text-align:center; }
+.doc-form-icon-card:hover { border-color:var(--primary);background:rgba(61,132,153,.07);transform:translateY(-4px);box-shadow:0 8px 24px rgba(0,0,0,.1); }
+.doc-form-icon-emoji { font-size:44px;line-height:1; }
+.doc-form-icon-name { font-size:15px;font-weight:700;color:var(--text); }
+.doc-form-icon-desc { font-size:12px;color:var(--text-sub); }
 /* 기안 서식 테이블 */
 .form-table { width:100%;border-collapse:collapse;margin-top:12px;margin-bottom:20px;font-size:13px;border-bottom:1px solid #b0b8c1; }
 .form-table th,.form-table td { border:1px solid #b0b8c1;padding:7px 10px; }
@@ -717,136 +725,119 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
 
     <!-- ===== WRITE DOC ===== -->
     <div class="page" id="page-writeDoc">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-        <div>
-          <h2 style="font-size:18px;font-weight:700;color:var(--primary)">✍️ 문서 기안</h2>
-          <p style="font-size:13px;color:var(--text-sub);margin-top:2px">새 결재 문서를 작성합니다.</p>
+      <!-- 숨겨진 데이터 필드 -->
+      <span style="display:none" id="docWriter"></span>
+      <span style="display:none" id="docDate"></span>
+      <span style="display:none" id="docDept"></span>
+      <select style="display:none" id="docType">
+        <option>업무보고</option><option>지출결의서</option>
+        <option>휴가신청서</option><option>외출신청서</option>
+        <option>교육신청서</option><option>근무변경신청서</option>
+        <option>물품구매요청서</option><option>출장신청서</option><option>인사관련</option>
+        <option>시설관리</option><option>기타</option>
+      </select>
+      <select style="display:none" id="docUrgency">
+        <option value="normal">일반</option><option value="urgent">긴급</option><option value="very-urgent">매우 긴급</option>
+      </select>
+      <select style="display:none" id="docRetention">
+        <option>1년</option><option>3년</option><option>5년</option><option>영구</option>
+      </select>
+
+      <!-- Step 1: 양식 선택 화면 -->
+      <div id="docFormSelectorView">
+        <div style="text-align:center;padding:32px 0 24px">
+          <h2 style="font-size:20px;font-weight:700;color:var(--primary)">✍️ 문서 기안</h2>
+          <p style="font-size:14px;color:var(--text-sub);margin-top:6px">작성할 양식을 선택하세요.</p>
         </div>
-        <div style="display:flex;gap:8px" class="no-print">
-          <button class="btn btn-secondary" onclick="clearDocForm()">🗑️ 초기화</button>
-          <button class="btn btn-outline" onclick="saveDraft()">💾 임시저장</button>
-          <button class="btn btn-primary" onclick="submitDoc()">📤 기안 제출</button>
+        <div class="doc-form-icon-grid">
+          <button class="doc-form-icon-card" onclick="selectDocForm('휴가신청서')">
+            <span class="doc-form-icon-emoji">🏖️</span>
+            <span class="doc-form-icon-name">휴가신청서</span>
+            <span class="doc-form-icon-desc">연차·병가·경조사 등</span>
+          </button>
+          <button class="doc-form-icon-card" onclick="selectDocForm('외출신청서')">
+            <span class="doc-form-icon-emoji">🚶</span>
+            <span class="doc-form-icon-name">외출신청서</span>
+            <span class="doc-form-icon-desc">외출·조퇴 신청</span>
+          </button>
+          <button class="doc-form-icon-card" onclick="selectDocForm('교육신청서')">
+            <span class="doc-form-icon-emoji">📚</span>
+            <span class="doc-form-icon-name">교육신청서</span>
+            <span class="doc-form-icon-desc">외부 교육·연수 참가</span>
+          </button>
+          <button class="doc-form-icon-card" onclick="selectDocForm('근무변경신청서')">
+            <span class="doc-form-icon-emoji">🔄</span>
+            <span class="doc-form-icon-name">근무변경신청서</span>
+            <span class="doc-form-icon-desc">근무 일정·시간 변경</span>
+          </button>
         </div>
       </div>
-      <div class="doc-form">
-        <div class="doc-title-bar">
-          <input type="text" id="docTitle" placeholder="📝 문서 제목을 입력하세요">
-        </div>
-        <div class="doc-meta">
-          <div class="doc-meta-item">
-            <label>문서 종류</label>
-            <select id="docType">
-              <option>업무보고</option><option>지출결의서</option>
-              <option>휴가신청서</option><option>외출신청서</option>
-              <option>교육신청서</option><option>근무변경신청서</option>
-              <option>물품구매요청서</option><option>출장신청서</option><option>인사관련</option>
-              <option>시설관리</option><option>기타</option>
-            </select>
-          </div>
-          <div class="doc-meta-item">
-            <label>기안자</label>
-            <span id="docWriter">-</span>
-          </div>
-          <div class="doc-meta-item">
-            <label>작성일</label>
-            <span id="docDate">-</span>
-          </div>
-          <div class="doc-meta-item">
-            <label>부서</label>
-            <span id="docDept">-</span>
-          </div>
-          <div class="doc-meta-item">
-            <label>긴급도</label>
-            <select id="docUrgency">
-              <option value="normal">일반</option>
-              <option value="urgent">긴급</option>
-              <option value="very-urgent">매우 긴급</option>
-            </select>
-          </div>
-          <div class="doc-meta-item">
-            <label>보존기간</label>
-            <select id="docRetention">
-              <option>1년</option><option>3년</option><option>5년</option><option>영구</option>
-            </select>
+
+      <!-- Step 2: 양식 작성 화면 -->
+      <div id="docFormEditorView" style="display:none">
+        <!-- 상단 헤더: 양식명 + 버튼 -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+          <h2 id="docFormEditorTitle" style="font-size:17px;font-weight:700;color:var(--primary);margin:0"></h2>
+          <div style="margin-left:auto;display:flex;gap:8px" class="no-print">
+            <button class="btn btn-secondary" onclick="openDocFormSelect()">📋 양식 변경</button>
+            <button class="btn btn-outline" onclick="openApprovalModal()">+ 결재자 추가</button>
+            <button class="btn btn-primary" onclick="submitDoc()">📤 기안 제출</button>
           </div>
         </div>
-        <div style="padding:16px 20px;border-bottom:1px solid var(--border);background:var(--surface2)">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-            <label style="font-size:12px;font-weight:600;color:var(--text-sub)">🔗 결재라인</label>
-            <button class="btn btn-sm btn-outline" onclick="openApprovalModal()">+ 결재자 추가</button>
-          </div>
-          <div class="approval-line" id="docApprovalLine">
-            <span style="font-size:13px;color:var(--text-muted)">결재자를 추가해주세요.</span>
-          </div>
-        </div>
-        <div class="doc-body-area">
-          <!-- 서식 모드 안내 바 (서식 선택 시 표시) -->
-          <div id="docFormModeBar" style="display:none;align-items:center;gap:10px;padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border)">
-            <span style="font-size:13px;font-weight:600;color:var(--primary)" id="docFormModeName"></span>
-            <span style="font-size:12px;color:var(--text-sub)">서식이 적용되었습니다. 각 항목을 클릭하여 내용을 입력하세요.</span>
-            <button class="btn btn-sm btn-outline" style="margin-left:auto" onclick="openDocFormSelect()">📋 양식 변경</button>
-          </div>
-          <!-- 문서기안 에디터 툴바 -->
-          <div id="docEditorToolbar" class="doc-editor-toolbar">
-            <select class="editor-select" onchange="docExecCmd('formatBlock',this.value);this.value=''" title="단락 스타일">
-              <option value="">단락</option>
-              <option value="h2">제목 1</option>
-              <option value="h3">제목 2</option>
-              <option value="h4">제목 3</option>
-              <option value="p">본문</option>
-            </select>
-            <select class="editor-select" onchange="docExecCmd('fontSize',this.value);this.value=''" title="글자 크기" style="width:64px">
-              <option value="">크기</option>
-              <option value="1">10px</option><option value="2">12px</option><option value="3">14px</option>
-              <option value="4">16px</option><option value="5">18px</option><option value="6">24px</option>
-            </select>
-            <div class="editor-divider"></div>
-            <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('bold')" title="굵게"><b>B</b></button>
-            <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('italic')" title="기울임"><i>I</i></button>
-            <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('underline')" title="밑줄"><u>U</u></button>
-            <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('strikeThrough')" title="취소선"><s>S</s></button>
-            <div class="editor-divider"></div>
-            <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('justifyLeft')" title="왼쪽 정렬">◀</button>
-            <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('justifyCenter')" title="가운데 정렬">▬</button>
-            <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('justifyRight')" title="오른쪽 정렬">▶</button>
-            <div class="editor-divider"></div>
-            <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('insertUnorderedList')" title="글머리 기호">• 목록</button>
-            <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('insertOrderedList')" title="번호 목록">1. 목록</button>
-            <button class="editor-btn" onmousedown="event.preventDefault();docInsertTable()" title="표 삽입">⊞ 표</button>
-            <button class="editor-btn" onmousedown="event.preventDefault();docInsertChecklist()" title="체크리스트 추가">☑ 체크</button>
-            <div class="editor-divider"></div>
-            <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('indent')" title="들여쓰기">→</button>
-            <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('outdent')" title="내어쓰기">←</button>
-            <div class="editor-divider"></div>
-            <div class="color-palette-wrap">
-              <button class="editor-btn color-palette-btn" id="docFontColorBtn" onclick="togglePalette('docFontPalette')" title="글자 색" style="gap:2px"><span id="docFontColorSwatch" style="width:12px;height:12px;border-radius:2px;background:#1c2633;border:1px solid #ccc;display:inline-block"></span>A</button>
-              <div class="color-palette-popup" id="docFontPalette">
-                <div class="cp-title">글자 색</div>
-                <div class="color-swatches" id="docFontSwatches"></div>
-                <div class="color-custom-row"><label>직접 선택</label><input type="color" value="#1c2633" onchange="applyDocColor('fore',this.value)"></div>
-              </div>
+        <div class="doc-form">
+          <!-- 결재라인 -->
+          <div style="padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface2)">
+            <div class="approval-line" id="docApprovalLine">
+              <span style="font-size:13px;color:var(--text-muted)">결재자를 추가해주세요.</span>
             </div>
-            <div class="color-palette-wrap">
-              <button class="editor-btn color-palette-btn" id="docBgColorBtn" onclick="togglePalette('docBgPalette')" title="배경(형광펜) 색" style="gap:2px"><span id="docBgColorSwatch" style="width:12px;height:12px;border-radius:2px;background:#ffff00;border:1px solid #ccc;display:inline-block"></span>🖍</button>
-              <div class="color-palette-popup" id="docBgPalette">
-                <div class="cp-title">배경(형광펜) 색</div>
-                <div class="color-swatches" id="docBgSwatches"></div>
-                <div class="color-custom-row"><label>직접 선택</label><input type="color" value="#ffff00" onchange="applyDocColor('bg',this.value)"></div>
-              </div>
-            </div>
-            <div class="editor-divider"></div>
-            <button class="editor-btn" onmousedown="event.preventDefault();docInsertLink()" title="링크">🔗</button>
-            <button class="editor-btn" onmousedown="event.preventDefault();docInsertTemplate()" title="서식 불러오기" style="margin-left:4px">📋 서식</button>
-            <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('removeFormat')" title="서식 제거" style="margin-left:auto">✕ 서식제거</button>
           </div>
-          <div id="docContent"
-               class="doc-editor-area"
-               contenteditable="true"
-               data-placeholder="문서 내용을 입력하세요..."></div>
-        </div>
-        <div style="padding:16px 20px;border-top:1px solid var(--border);background:var(--surface2)">
-          <label style="font-size:12px;font-weight:600;color:var(--text-sub);display:block;margin-bottom:8px">📎 첨부파일</label>
-          <input type="file" multiple>
+          <!-- 에디터 -->
+          <div class="doc-body-area">
+            <div id="docEditorToolbar" class="doc-editor-toolbar">
+              <select class="editor-select" onchange="docExecCmd('formatBlock',this.value);this.value=''" title="단락 스타일">
+                <option value="">단락</option><option value="h2">제목 1</option><option value="h3">제목 2</option><option value="h4">제목 3</option><option value="p">본문</option>
+              </select>
+              <select class="editor-select" onchange="docExecCmd('fontSize',this.value);this.value=''" title="글자 크기" style="width:64px">
+                <option value="">크기</option><option value="1">10px</option><option value="2">12px</option><option value="3">14px</option><option value="4">16px</option><option value="5">18px</option><option value="6">24px</option>
+              </select>
+              <div class="editor-divider"></div>
+              <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('bold')" title="굵게"><b>B</b></button>
+              <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('italic')" title="기울임"><i>I</i></button>
+              <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('underline')" title="밑줄"><u>U</u></button>
+              <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('strikeThrough')" title="취소선"><s>S</s></button>
+              <div class="editor-divider"></div>
+              <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('justifyLeft')" title="왼쪽 정렬">◀</button>
+              <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('justifyCenter')" title="가운데 정렬">▬</button>
+              <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('justifyRight')" title="오른쪽 정렬">▶</button>
+              <div class="editor-divider"></div>
+              <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('insertUnorderedList')" title="글머리 기호">• 목록</button>
+              <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('insertOrderedList')" title="번호 목록">1. 목록</button>
+              <button class="editor-btn" onmousedown="event.preventDefault();docInsertTable()" title="표 삽입">⊞ 표</button>
+              <div class="editor-divider"></div>
+              <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('indent')" title="들여쓰기">→</button>
+              <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('outdent')" title="내어쓰기">←</button>
+              <div class="editor-divider"></div>
+              <div class="color-palette-wrap">
+                <button class="editor-btn color-palette-btn" id="docFontColorBtn" onclick="togglePalette('docFontPalette')" title="글자 색" style="gap:2px"><span id="docFontColorSwatch" style="width:12px;height:12px;border-radius:2px;background:#1c2633;border:1px solid #ccc;display:inline-block"></span>A</button>
+                <div class="color-palette-popup" id="docFontPalette">
+                  <div class="cp-title">글자 색</div>
+                  <div class="color-swatches" id="docFontSwatches"></div>
+                  <div class="color-custom-row"><label>직접 선택</label><input type="color" value="#1c2633" onchange="applyDocColor('fore',this.value)"></div>
+                </div>
+              </div>
+              <div class="color-palette-wrap">
+                <button class="editor-btn color-palette-btn" id="docBgColorBtn" onclick="togglePalette('docBgPalette')" title="배경(형광펜) 색" style="gap:2px"><span id="docBgColorSwatch" style="width:12px;height:12px;border-radius:2px;background:#ffff00;border:1px solid #ccc;display:inline-block"></span>🖍</button>
+                <div class="color-palette-popup" id="docBgPalette">
+                  <div class="cp-title">배경(형광펜) 색</div>
+                  <div class="color-swatches" id="docBgSwatches"></div>
+                  <div class="color-custom-row"><label>직접 선택</label><input type="color" value="#ffff00" onchange="applyDocColor('bg',this.value)"></div>
+                </div>
+              </div>
+              <div class="editor-divider"></div>
+              <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('removeFormat')" title="서식 제거" style="margin-left:auto">✕ 서식제거</button>
+            </div>
+            <div id="docContent" class="doc-editor-area" contenteditable="true" data-placeholder="문서 내용을 입력하세요..."></div>
+          </div>
         </div>
       </div>
     </div>
@@ -1228,41 +1219,6 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
 </div><!-- end appPage -->
 
 <!-- ===== MODALS ===== -->
-
-<!-- 문서 양식 선택 모달 -->
-<div class="modal-overlay" id="docFormSelectModal">
-  <div class="modal" style="max-width:520px;width:96%">
-    <div class="modal-header">
-      <h3>📋 문서 양식 선택</h3>
-      <button class="modal-close" onclick="closeModal('docFormSelectModal')">×</button>
-    </div>
-    <div class="modal-body" style="padding:24px">
-      <p style="font-size:13px;color:var(--text-sub);margin-bottom:20px">작성할 문서 양식을 선택하세요.</p>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <button class="doc-form-select-btn" onclick="selectDocForm('휴가신청서')">
-          <span style="font-size:28px">🏖️</span>
-          <span class="doc-form-select-name">휴가신청서</span>
-          <span class="doc-form-select-desc">연차·병가·경조사 등 휴가 신청</span>
-        </button>
-        <button class="doc-form-select-btn" onclick="selectDocForm('외출신청서')">
-          <span style="font-size:28px">🚶</span>
-          <span class="doc-form-select-name">외출신청서</span>
-          <span class="doc-form-select-desc">업무 외출·조퇴 신청</span>
-        </button>
-        <button class="doc-form-select-btn" onclick="selectDocForm('교육신청서')">
-          <span style="font-size:28px">📚</span>
-          <span class="doc-form-select-name">교육신청서</span>
-          <span class="doc-form-select-desc">외부 교육·연수 참가 신청</span>
-        </button>
-        <button class="doc-form-select-btn" onclick="selectDocForm('근무변경신청서')">
-          <span style="font-size:28px">🔄</span>
-          <span class="doc-form-select-name">근무변경신청서</span>
-          <span class="doc-form-select-desc">근무 일정·시간 변경 신청</span>
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
 
 <!-- 달력 에디터 모달 -->
 <div class="modal-overlay" id="calEditorModal">
@@ -2835,7 +2791,8 @@ function clearDocForm() {
 // 문서 양식 선택
 // ============================================================
 function openDocFormSelect() {
-  openModal('docFormSelectModal');
+  document.getElementById('docFormSelectorView').style.display = '';
+  document.getElementById('docFormEditorView').style.display = 'none';
 }
 
 function toggleFormChk(el) {
@@ -2870,18 +2827,18 @@ function _setDocFormMode(formName) {
 }
 
 function selectDocForm(formName) {
-  closeModal('docFormSelectModal');
-  // 제목 자동 입력
-  document.getElementById('docTitle').value = formName;
-  // 문서 종류 select 동기화
+  // 제목·종류 자동 세팅
+  const titleEl = document.getElementById('docTitle');
+  if (titleEl) titleEl.value = formName;
   const sel = document.getElementById('docType');
-  for (let i = 0; i < sel.options.length; i++) {
-    if (sel.options[i].text === formName || sel.options[i].value === formName) {
-      sel.selectedIndex = i; break;
-    }
-  }
+  if (sel) { for (let i = 0; i < sel.options.length; i++) { if (sel.options[i].text === formName) { sel.selectedIndex = i; break; } } }
+  // 에디터 헤더 양식명 표시
+  const titleH = document.getElementById('docFormEditorTitle');
+  if (titleH) titleH.textContent = '✍️ ' + formName;
+  // 뷰 전환: 선택 화면 숨기고 에디터 표시
+  document.getElementById('docFormSelectorView').style.display = 'none';
+  document.getElementById('docFormEditorView').style.display = '';
   // 서식 모드로 전환
-  _setDocFormMode(formName);
   // 서식 내용 삽입
   const today = new Date();
   const todayStr = `${today.getFullYear()}년 ${today.getMonth()+1}월 ${today.getDate()}일`;
@@ -2956,10 +2913,8 @@ function selectDocForm(formName) {
 }
 
 function _setWriteDocHeader(isEdit) {
-  const h2 = document.querySelector('#page-writeDoc h2');
-  const p  = document.querySelector('#page-writeDoc p');
-  if (h2) h2.textContent = isEdit ? '✏️ 기안문서 수정' : '✍️ 문서 기안';
-  if (p)  p.textContent  = isEdit ? '기존 기안문서를 수정합니다.' : '새 결재 문서를 작성합니다.';
+  const h = document.getElementById('docFormEditorTitle');
+  if (h) h.textContent = isEdit ? '✏️ 기안문서 수정' : '✍️ 문서 기안';
 }
 
 function saveDraft() {
@@ -3136,8 +3091,10 @@ function editDoc(docId) {
   renderDocApprovalLine();
   // 헤더 수정 모드로 변경
   _setWriteDocHeader(true);
-  // 기존 문서 편집 시 서식 모드 해제 (자유 편집 가능)
+  // 기존 문서 편집 시 에디터 뷰 바로 표시
   _setDocFormMode(null);
+  document.getElementById('docFormSelectorView').style.display = 'none';
+  document.getElementById('docFormEditorView').style.display = '';
   closeModal('docViewModal');
   showPage('writeDoc', null);
 }
