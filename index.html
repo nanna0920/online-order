@@ -435,11 +435,12 @@ canvas#sigCanvas { display:block; cursor:crosshair; touch-action:none; }
 .form-table { width:100%;border-collapse:collapse;margin-top:12px;font-size:13px; }
 .form-table th,.form-table td { border:1px solid #b0b8c1;padding:7px 10px; }
 .form-table th { background:#f0f4f8;font-weight:600;color:var(--text-sub);white-space:nowrap;width:120px; }
-.form-table td { background:#fff;min-width:160px; }
-.form-table td[contenteditable="true"] { outline:none; }
-.form-table td[contenteditable="true"]:focus { background:#fafcff; }
+.form-table td { background:#fff;min-width:160px;cursor:text; }
+.form-table td:focus,.form-table td:focus-within { background:#f5f9ff;outline:none; }
 .form-title { font-size:20px;font-weight:700;text-align:center;padding:14px 0 10px;letter-spacing:2px; }
 .form-sub { font-size:12px;color:var(--text-sub);text-align:right;margin-bottom:6px; }
+/* 서식 모드일 때 docContent 내 자유입력 방지 시각 힌트 */
+[data-formmode="1"] { background:var(--surface) !important; }
 .cal-title { font-weight:700; font-size:14px; color:var(--primary); }
 .cal-team-sel { width:100%; padding:6px 10px; border:1.5px solid var(--border); border-radius:var(--radius-sm); font-size:12px; font-family:inherit; color:var(--text); background:var(--surface); outline:none; margin-bottom:8px; cursor:pointer; }
 .cal-team-sel:focus { border-color:var(--primary); }
@@ -806,8 +807,14 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
           </div>
         </div>
         <div class="doc-body-area">
+          <!-- 서식 모드 안내 바 (서식 선택 시 표시) -->
+          <div id="docFormModeBar" style="display:none;align-items:center;gap:10px;padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border)">
+            <span style="font-size:13px;font-weight:600;color:var(--primary)" id="docFormModeName"></span>
+            <span style="font-size:12px;color:var(--text-sub)">서식이 적용되었습니다. 각 항목을 클릭하여 내용을 입력하세요.</span>
+            <button class="btn btn-sm btn-outline" style="margin-left:auto" onclick="openDocFormSelect()">📋 양식 변경</button>
+          </div>
           <!-- 문서기안 에디터 툴바 -->
-          <div class="doc-editor-toolbar">
+          <div id="docEditorToolbar" class="doc-editor-toolbar">
             <select class="editor-select" onchange="docExecCmd('formatBlock',this.value);this.value=''" title="단락 스타일">
               <option value="">단락</option>
               <option value="h2">제목 1</option>
@@ -2883,6 +2890,7 @@ function clearDocForm() {
   selectedApprovers=[];
   renderDocApprovalLine();
   _setWriteDocHeader(false);
+  _setDocFormMode(null); // 서식 모드 해제
   openDocFormSelect();
 }
 
@@ -2891,6 +2899,31 @@ function clearDocForm() {
 // ============================================================
 function openDocFormSelect() {
   openModal('docFormSelectModal');
+}
+
+function _setDocFormMode(formName) {
+  const toolbar = document.getElementById('docEditorToolbar');
+  const modeBar = document.getElementById('docFormModeBar');
+  const modeName = document.getElementById('docFormModeName');
+  const content = document.getElementById('docContent');
+  if (formName) {
+    if (toolbar) toolbar.style.display = 'none';
+    if (modeBar) modeBar.style.display = 'flex';
+    if (modeName) modeName.textContent = '📋 ' + formName;
+    if (content) {
+      content.contentEditable = 'false'; // 바깥 자유 입력 방지
+      content.style.padding = '20px 24px';
+      content.setAttribute('data-formmode', '1');
+    }
+  } else {
+    if (toolbar) toolbar.style.display = '';
+    if (modeBar) modeBar.style.display = 'none';
+    if (content) {
+      content.contentEditable = 'true';
+      content.style.padding = '';
+      content.removeAttribute('data-formmode');
+    }
+  }
 }
 
 function selectDocForm(formName) {
@@ -2904,6 +2937,8 @@ function selectDocForm(formName) {
       sel.selectedIndex = i; break;
     }
   }
+  // 서식 모드로 전환
+  _setDocFormMode(formName);
   // 서식 내용 삽입
   const today = new Date();
   const todayStr = `${today.getFullYear()}년 ${today.getMonth()+1}월 ${today.getDate()}일`;
@@ -2912,19 +2947,18 @@ function selectDocForm(formName) {
   const pos  = u.pos  || '';
   const name = u.name || '';
 
+  const ce = 'contenteditable="true"';
   const templates = {
     '휴가신청서': `
 <div class="form-title">휴가신청서</div>
 <div class="form-sub">작성일 : ${todayStr}</div>
 <table class="form-table">
-  <tr><th>소속 부서</th><td>${dept}</td><th>직위</th><td>${pos}</td></tr>
-  <tr><th>성 명</th><td>${name}</td><th>연락처</th><td></td></tr>
-  <tr><th>휴가 종류</th><td colspan="3">
-    □ 연차&nbsp;&nbsp; □ 병가&nbsp;&nbsp; □ 경조사&nbsp;&nbsp; □ 공가&nbsp;&nbsp; □ 기타( )
-  </td></tr>
-  <tr><th>휴가 기간</th><td colspan="3">&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;일 ~&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;일 ( 총&nbsp;&nbsp;&nbsp;일)</td></tr>
-  <tr><th>휴가 사유</th><td colspan="3" style="height:60px"></td></tr>
-  <tr><th>비고</th><td colspan="3"></td></tr>
+  <tr><th>소속 부서</th><td ${ce}>${dept}</td><th>직위</th><td ${ce}>${pos}</td></tr>
+  <tr><th>성 명</th><td ${ce}>${name}</td><th>연락처</th><td ${ce}></td></tr>
+  <tr><th>휴가 종류</th><td ${ce} colspan="3">□ 연차&nbsp;&nbsp; □ 병가&nbsp;&nbsp; □ 경조사&nbsp;&nbsp; □ 공가&nbsp;&nbsp; □ 기타( )</td></tr>
+  <tr><th>휴가 기간</th><td ${ce} colspan="3"></td></tr>
+  <tr><th>휴가 사유</th><td ${ce} colspan="3" style="height:72px"></td></tr>
+  <tr><th>비고</th><td ${ce} colspan="3"></td></tr>
 </table>
 <p style="margin-top:16px;font-size:13px;color:#555;">위와 같이 휴가를 신청합니다.</p>`,
 
@@ -2932,13 +2966,13 @@ function selectDocForm(formName) {
 <div class="form-title">외출신청서</div>
 <div class="form-sub">작성일 : ${todayStr}</div>
 <table class="form-table">
-  <tr><th>소속 부서</th><td>${dept}</td><th>직위</th><td>${pos}</td></tr>
-  <tr><th>성 명</th><td>${name}</td><th>연락처</th><td></td></tr>
-  <tr><th>외출 종류</th><td colspan="3">□ 외출&nbsp;&nbsp; □ 조퇴&nbsp;&nbsp; □ 기타( )</td></tr>
-  <tr><th>외출 일시</th><td colspan="3">&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;일&nbsp;&nbsp;&nbsp;시&nbsp;&nbsp;&nbsp;분 ~&nbsp;&nbsp;&nbsp;시&nbsp;&nbsp;&nbsp;분</td></tr>
-  <tr><th>행선지</th><td colspan="3"></td></tr>
-  <tr><th>외출 목적</th><td colspan="3" style="height:60px"></td></tr>
-  <tr><th>비고</th><td colspan="3"></td></tr>
+  <tr><th>소속 부서</th><td ${ce}>${dept}</td><th>직위</th><td ${ce}>${pos}</td></tr>
+  <tr><th>성 명</th><td ${ce}>${name}</td><th>연락처</th><td ${ce}></td></tr>
+  <tr><th>외출 종류</th><td ${ce} colspan="3">□ 외출&nbsp;&nbsp; □ 조퇴&nbsp;&nbsp; □ 기타( )</td></tr>
+  <tr><th>외출 일시</th><td ${ce} colspan="3"></td></tr>
+  <tr><th>행선지</th><td ${ce} colspan="3"></td></tr>
+  <tr><th>외출 목적</th><td ${ce} colspan="3" style="height:72px"></td></tr>
+  <tr><th>비고</th><td ${ce} colspan="3"></td></tr>
 </table>
 <p style="margin-top:16px;font-size:13px;color:#555;">위와 같이 외출을 신청합니다.</p>`,
 
@@ -2946,15 +2980,15 @@ function selectDocForm(formName) {
 <div class="form-title">교육신청서</div>
 <div class="form-sub">작성일 : ${todayStr}</div>
 <table class="form-table">
-  <tr><th>소속 부서</th><td>${dept}</td><th>직위</th><td>${pos}</td></tr>
-  <tr><th>성 명</th><td>${name}</td><th>연락처</th><td></td></tr>
-  <tr><th>교육명</th><td colspan="3"></td></tr>
-  <tr><th>교육 기간</th><td colspan="3">&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;일 ~&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;일 ( 총&nbsp;&nbsp;&nbsp;일)</td></tr>
-  <tr><th>교육 장소</th><td colspan="3"></td></tr>
-  <tr><th>주관 기관</th><td colspan="3"></td></tr>
-  <tr><th>교육 비용</th><td colspan="3">원 (□ 전액 회사 부담&nbsp;&nbsp; □ 일부 자부담&nbsp;&nbsp; □ 자비)</td></tr>
-  <tr><th>교육 목적</th><td colspan="3" style="height:60px"></td></tr>
-  <tr><th>비고</th><td colspan="3"></td></tr>
+  <tr><th>소속 부서</th><td ${ce}>${dept}</td><th>직위</th><td ${ce}>${pos}</td></tr>
+  <tr><th>성 명</th><td ${ce}>${name}</td><th>연락처</th><td ${ce}></td></tr>
+  <tr><th>교육명</th><td ${ce} colspan="3"></td></tr>
+  <tr><th>교육 기간</th><td ${ce} colspan="3"></td></tr>
+  <tr><th>교육 장소</th><td ${ce} colspan="3"></td></tr>
+  <tr><th>주관 기관</th><td ${ce} colspan="3"></td></tr>
+  <tr><th>교육 비용</th><td ${ce} colspan="3">□ 전액 회사 부담&nbsp;&nbsp; □ 일부 자부담&nbsp;&nbsp; □ 자비</td></tr>
+  <tr><th>교육 목적</th><td ${ce} colspan="3" style="height:72px"></td></tr>
+  <tr><th>비고</th><td ${ce} colspan="3"></td></tr>
 </table>
 <p style="margin-top:16px;font-size:13px;color:#555;">위와 같이 교육 참가를 신청합니다.</p>`,
 
@@ -2962,13 +2996,13 @@ function selectDocForm(formName) {
 <div class="form-title">근무변경신청서</div>
 <div class="form-sub">작성일 : ${todayStr}</div>
 <table class="form-table">
-  <tr><th>소속 부서</th><td>${dept}</td><th>직위</th><td>${pos}</td></tr>
-  <tr><th>성 명</th><td>${name}</td><th>연락처</th><td></td></tr>
-  <tr><th>변경 대상일</th><td colspan="3">&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;일 (&nbsp;&nbsp;&nbsp;요일)</td></tr>
-  <tr><th>현재 근무</th><td colspan="3"></td></tr>
-  <tr><th>변경 희망</th><td colspan="3"></td></tr>
-  <tr><th>변경 사유</th><td colspan="3" style="height:60px"></td></tr>
-  <tr><th>비고</th><td colspan="3"></td></tr>
+  <tr><th>소속 부서</th><td ${ce}>${dept}</td><th>직위</th><td ${ce}>${pos}</td></tr>
+  <tr><th>성 명</th><td ${ce}>${name}</td><th>연락처</th><td ${ce}></td></tr>
+  <tr><th>변경 대상일</th><td ${ce} colspan="3"></td></tr>
+  <tr><th>현재 근무</th><td ${ce} colspan="3"></td></tr>
+  <tr><th>변경 희망</th><td ${ce} colspan="3"></td></tr>
+  <tr><th>변경 사유</th><td ${ce} colspan="3" style="height:72px"></td></tr>
+  <tr><th>비고</th><td ${ce} colspan="3"></td></tr>
 </table>
 <p style="margin-top:16px;font-size:13px;color:#555;">위와 같이 근무 변경을 신청합니다.</p>`
   };
@@ -3158,6 +3192,8 @@ function editDoc(docId) {
   renderDocApprovalLine();
   // 헤더 수정 모드로 변경
   _setWriteDocHeader(true);
+  // 기존 문서 편집 시 서식 모드 해제 (자유 편집 가능)
+  _setDocFormMode(null);
   closeModal('docViewModal');
   showPage('writeDoc', null);
 }
