@@ -2835,21 +2835,18 @@ function openDocFormSelect() {
 }
 
 function _setDocFormMode(formName) {
-  const toolbar = document.getElementById('docEditorToolbar');
   const modeBar = document.getElementById('docFormModeBar');
   const modeName = document.getElementById('docFormModeName');
   const content = document.getElementById('docContent');
   if (formName) {
-    if (toolbar) toolbar.style.display = 'none';
     if (modeBar) modeBar.style.display = 'flex';
     if (modeName) modeName.textContent = '📋 ' + formName;
     if (content) {
-      content.contentEditable = 'false'; // 바깥 자유 입력 방지
+      content.contentEditable = 'true';
       content.style.padding = '20px 24px';
       content.setAttribute('data-formmode', '1');
     }
   } else {
-    if (toolbar) toolbar.style.display = '';
     if (modeBar) modeBar.style.display = 'none';
     if (content) {
       content.contentEditable = 'true';
