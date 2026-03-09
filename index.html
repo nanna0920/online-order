@@ -3377,19 +3377,37 @@ function printDoc(docId) {
     return `<td class="ap-cell" style="padding:4px 8px">${stamp}<span class="ap-date" style="margin-top:2px">${a.date||''}</span></td>`;
   }).join('');
 
-  const printHtml = `
-    <div class="pd-title">${doc.title}</div>
-    <div class="pd-approval-wrap" style="margin-top:10px">
+  // 제출일 년월일 형식 변환
+  const dateParts = (doc.date || '').split('-');
+  const submitDateStr = dateParts.length === 3
+    ? `${dateParts[0]}년 ${dateParts[1]}월 ${dateParts[2]}일`
+    : doc.date;
+
+  // 결재표 HTML
+  const approvalTableHtml = `
+    <div class="pd-approval-wrap" style="margin-top:8px;margin-bottom:8px">
       <table class="pd-approval-table">
         <tr><th class="ap-row-label" rowspan="2" style="vertical-align:middle;font-size:13px;letter-spacing:2px;padding:6px 10px">결<br>재</th>${approverHeaders}</tr>
         <tr>${approverCells}</tr>
       </table>
       <div class="pd-clearfix"></div>
-    </div>
+    </div>`;
 
-    <div class="pd-body-no-date" style="padding:16px 0;font-size:13px;line-height:1.8">${renderDocContent(doc.content)}</div>
+  // 내용 렌더링 후 form-title 아래에 결재표 삽입
+  const tmp = document.createElement('div');
+  tmp.innerHTML = renderDocContent(doc.content);
+  // form-sub(작성일) 제거
+  tmp.querySelectorAll('.form-sub').forEach(el => el.remove());
+  const formTitle = tmp.querySelector('.form-title');
+  if (formTitle) {
+    formTitle.insertAdjacentHTML('afterend', approvalTableHtml);
+  }
+  const renderedContent = tmp.innerHTML;
 
-    <div style="margin-top:32px;text-align:center;font-size:15px;color:#555">${doc.date}</div>
+  const printHtml = `
+    <div class="pd-body-no-date" style="font-size:13px;line-height:1.8">${renderedContent}</div>
+
+    <div style="margin-top:32px;text-align:center;font-size:20px;color:#333">${submitDateStr}</div>
     <div style="margin-top:8px;text-align:center;font-size:25px;font-weight:700;letter-spacing:4px">${companyName} 귀하</div>
 
   `;
