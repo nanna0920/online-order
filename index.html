@@ -441,6 +441,10 @@ canvas#sigCanvas { display:block; cursor:crosshair; touch-action:none; }
 .form-sub { font-size:12px;color:var(--text-sub);text-align:right;margin-bottom:6px; }
 /* 서식 모드일 때 docContent 내 자유입력 방지 시각 힌트 */
 [data-formmode="1"] { background:var(--surface) !important; }
+/* 서식 체크박스 */
+.form-chk { display:inline-block;width:16px;height:16px;border:1.5px solid #555;border-radius:2px;text-align:center;line-height:14px;font-size:12px;cursor:pointer;user-select:none;vertical-align:middle;margin-right:3px;color:#1a3a5c;font-weight:700; }
+.form-chk.checked { background:#1a3a5c;border-color:#1a3a5c;color:#fff; }
+.form-chk-label { vertical-align:middle;margin-right:12px; }
 .cal-title { font-weight:700; font-size:14px; color:var(--primary); }
 .cal-team-sel { width:100%; padding:6px 10px; border:1.5px solid var(--border); border-radius:var(--radius-sm); font-size:12px; font-family:inherit; color:var(--text); background:var(--surface); outline:none; margin-bottom:8px; cursor:pointer; }
 .cal-team-sel:focus { border-color:var(--primary); }
@@ -2834,6 +2838,11 @@ function openDocFormSelect() {
   openModal('docFormSelectModal');
 }
 
+function toggleFormChk(el) {
+  el.classList.toggle('checked');
+  el.textContent = el.classList.contains('checked') ? 'V' : '';
+}
+
 function _setDocFormMode(formName) {
   const modeBar = document.getElementById('docFormModeBar');
   const modeName = document.getElementById('docFormModeName');
@@ -2878,6 +2887,7 @@ function selectDocForm(formName) {
   const name = u.name || '';
 
   const ce = 'contenteditable="true"';
+  const chk = (label) => `<span class="form-chk" onclick="event.stopPropagation();toggleFormChk(this)"></span><span class="form-chk-label">${label}</span>`;
   const templates = {
     '휴가신청서': `
 <div class="form-title">휴가신청서</div>
@@ -2885,7 +2895,7 @@ function selectDocForm(formName) {
 <table class="form-table">
   <tr><th>소속 부서</th><td ${ce}>${dept}</td><th>직위</th><td ${ce}>${pos}</td></tr>
   <tr><th>성 명</th><td ${ce}>${name}</td><th>연락처</th><td ${ce}></td></tr>
-  <tr><th>휴가 종류</th><td ${ce} colspan="3">□ 연차&nbsp;&nbsp; □ 병가&nbsp;&nbsp; □ 경조사&nbsp;&nbsp; □ 공가&nbsp;&nbsp; □ 기타( )</td></tr>
+  <tr><th>휴가 종류</th><td colspan="3" style="padding:8px 10px">${chk('연차')}${chk('병가')}${chk('경조사')}${chk('공가')}${chk('기타')}</td></tr>
   <tr><th>휴가 기간</th><td ${ce} colspan="3"></td></tr>
   <tr><th>휴가 사유</th><td ${ce} colspan="3" style="height:72px"></td></tr>
   <tr><th>비고</th><td ${ce} colspan="3"></td></tr>
@@ -2898,7 +2908,7 @@ function selectDocForm(formName) {
 <table class="form-table">
   <tr><th>소속 부서</th><td ${ce}>${dept}</td><th>직위</th><td ${ce}>${pos}</td></tr>
   <tr><th>성 명</th><td ${ce}>${name}</td><th>연락처</th><td ${ce}></td></tr>
-  <tr><th>외출 종류</th><td ${ce} colspan="3">□ 외출&nbsp;&nbsp; □ 조퇴&nbsp;&nbsp; □ 기타( )</td></tr>
+  <tr><th>외출 종류</th><td colspan="3" style="padding:8px 10px">${chk('외출')}${chk('조퇴')}${chk('기타')}</td></tr>
   <tr><th>외출 일시</th><td ${ce} colspan="3"></td></tr>
   <tr><th>행선지</th><td ${ce} colspan="3"></td></tr>
   <tr><th>외출 목적</th><td ${ce} colspan="3" style="height:72px"></td></tr>
@@ -2916,7 +2926,7 @@ function selectDocForm(formName) {
   <tr><th>교육 기간</th><td ${ce} colspan="3"></td></tr>
   <tr><th>교육 장소</th><td ${ce} colspan="3"></td></tr>
   <tr><th>주관 기관</th><td ${ce} colspan="3"></td></tr>
-  <tr><th>교육 비용</th><td ${ce} colspan="3">□ 전액 회사 부담&nbsp;&nbsp; □ 일부 자부담&nbsp;&nbsp; □ 자비</td></tr>
+  <tr><th>교육 비용</th><td colspan="3" style="padding:8px 10px">${chk('전액 회사 부담')}${chk('일부 자부담')}${chk('자비')}</td></tr>
   <tr><th>교육 목적</th><td ${ce} colspan="3" style="height:72px"></td></tr>
   <tr><th>비고</th><td ${ce} colspan="3"></td></tr>
 </table>
