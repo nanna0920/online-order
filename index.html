@@ -2171,32 +2171,34 @@ function renderCal(type) {
 
   // 권한 체크
   const isAdmin = currentUser?.role === 'admin';
+  const uid = currentUser?.id || '';
+  const myDeptName = currentUser?.dept || ''; // 내 소속 팀명
 
-  // 내가 팀장인 팀 목록
-  const myHeadDepts = DB.depts.filter(d => d.head === currentUser?.id);
-  const myHeadTeamName = myHeadDepts[0]?.name || '';
-
-  // 드롭다운에 보여줄 팀 목록
-  // - 관리자: 전체 팀
-  // - 팀장: 본인이 팀장인 팀만
-  // - 일반: 전체 팀(읽기 전용)
-  const visibleDepts = isAdmin ? DB.depts
-    : (myHeadDepts.length > 0 ? myHeadDepts : DB.depts);
+  // 드롭다운: 관리자=전체, 일반=본인 소속 팀만
+  const visibleDepts = isAdmin
+    ? DB.depts
+    : DB.depts.filter(d => d.name === myDeptName);
 
   // 현재 선택된 팀 결정
   const curSelVal = document.getElementById('calTeamSel')?.value || '';
   const curSelValid = visibleDepts.some(d => d.name === curSelVal);
   const team = type === 'team'
-    ? (curSelValid ? curSelVal : (myHeadTeamName || visibleDepts[0]?.name || ''))
+    ? (curSelValid ? curSelVal : (visibleDepts[0]?.name || ''))
     : null;
 
-  // canEdit: 관리자이거나 선택된 팀의 팀장
+  // canEdit:
+  // 1) 관리자
+  // 2) 해당 팀 지정 팀장 (dept.head === uid)
+  // 3) head 미지정 팀이고 본인이 그 팀 소속
   let canEdit = false;
   if (type === 'all') {
     canEdit = isAdmin;
   } else {
     const dept = DB.depts.find(d => d.name === team);
-    canEdit = isAdmin || (dept && dept.head === currentUser?.id);
+    const isDesignatedHead = dept && String(dept.head) === String(uid);
+    const isHeadUnset = dept && (!dept.head || dept.head === '');
+    const isMember = myDeptName === team;
+    canEdit = isAdmin || isDesignatedHead || (isHeadUnset && isMember);
   }
   const readonlyAttr = canEdit ? '' : 'readonly';
   const taStyle = canEdit ? '' : 'cursor:default;color:var(--text-sub);';
@@ -2433,10 +2435,17 @@ function calSaveEditor() {
 
   // 권한 재확인
   const isAdmin = currentUser?.role === 'admin';
+  const uid = currentUser?.id || '';
+  const myDeptName = currentUser?.dept || '';
   if (type === 'all' && !isAdmin) { showToast('관리자만 저장할 수 있습니다.', 'error'); return; }
   if (type === 'team') {
     const dept = DB.depts.find(d => d.name === team);
-    if (!isAdmin && !(dept && dept.head === currentUser?.id)) { showToast('해당 팀 팀장만 저장할 수 있습니다.', 'error'); return; }
+    const isDesignatedHead = dept && String(dept.head) === String(uid);
+    const isHeadUnset = dept && (!dept.head || dept.head === '');
+    const isMember = myDeptName === team;
+    if (!isAdmin && !isDesignatedHead && !(isHeadUnset && isMember)) {
+      showToast('해당 팀 팀장만 저장할 수 있습니다.', 'error'); return;
+    }
   }
 
   const content = document.getElementById('calEditorArea').innerHTML.trim();
