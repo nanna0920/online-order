@@ -441,8 +441,13 @@ canvas#sigCanvas { display:block; cursor:crosshair; touch-action:none; }
 .cal-td.today .cal-date-num { color:var(--primary); }
 .cal-td.sun-col .cal-date-num { color:#e74c3c; }
 .cal-td.sat-col .cal-date-num { color:#3498db; }
-.cal-cell-ta { width:100%; border:none; outline:none; resize:none; background:transparent; font-size:10.5px; font-family:inherit; line-height:1.45; color:var(--text); padding:0; height:56px; overflow-y:auto; }
-.cal-cell-ta:focus { background:rgba(26,58,92,0.04); border-radius:2px; }
+.cal-cell-ta { width:100%; border:none; outline:none; resize:none; background:transparent; font-size:10.5px; font-family:inherit; line-height:1.45; color:var(--text); padding:0; height:56px; overflow-y:hidden; }
+.cal-cell-ta:focus { background:rgba(26,58,92,0.04); border-radius:2px; overflow-y:auto; }
+/* 내용이 넘칠 때 */
+.cal-td { position:relative; }
+.cal-td.has-more .cal-cell-ta:not(:focus) { -webkit-mask-image:linear-gradient(to bottom,#000 55%,transparent 100%); mask-image:linear-gradient(to bottom,#000 55%,transparent 100%); }
+.cal-td.has-more::after { content:'▼ 더보기'; position:absolute; bottom:3px; right:4px; font-size:9px; font-weight:700; color:var(--accent); pointer-events:none; line-height:1; background:rgba(255,255,255,0.85); padding:0 2px; border-radius:2px; }
+.cal-td.today.has-more::after { background:rgba(26,58,92,0.06); }
 /* 년/월 피커 */
 .cal-picker-wrap { position:relative; }
 .cal-title-btn { background:none; border:none; font-weight:700; font-size:14px; color:var(--primary); cursor:pointer; padding:3px 8px; border-radius:var(--radius-sm); display:flex; align-items:center; gap:4px; transition:background .15s; font-family:inherit; }
@@ -2169,7 +2174,7 @@ function renderCal(type) {
 
     cells += `<td class="${tdCls}">
       <div class="cal-date-num">${d}</div>
-      <textarea class="cal-cell-ta" ${readonlyAttr} style="${taStyle}" ${blurHandler}>${content}</textarea>
+      <textarea class="cal-cell-ta" ${readonlyAttr} style="${taStyle}" ${blurHandler} oninput="calCheckOverflow(this)">${content}</textarea>
     </td>`;
     col++;
 
@@ -2242,6 +2247,19 @@ function renderCal(type) {
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
+
+  // 렌더 후 overflow 체크 (DOM 반영 후 실행)
+  const wrapId = type === 'all' ? 'calAllWrap' : 'calTeamWrap';
+  setTimeout(() => {
+    document.getElementById(wrapId)?.querySelectorAll('.cal-cell-ta').forEach(calCheckOverflow);
+  }, 0);
+}
+
+// 개별 textarea overflow 체크
+function calCheckOverflow(ta) {
+  const td = ta.closest('.cal-td');
+  if (!td) return;
+  td.classList.toggle('has-more', ta.scrollHeight > ta.clientHeight + 2);
 }
 
 function calMove(type, dir) {
