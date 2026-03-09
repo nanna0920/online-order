@@ -705,26 +705,6 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
           </div>
         </div>
       </div>
-      <div class="quick-actions">
-        <div class="quick-action" onclick="showPage('writeDoc',null)">
-          <div class="qa-icon">✍️</div><span>문서 기안</span>
-        </div>
-        <div class="quick-action" onclick="showPage('approvalBox',null)">
-          <div class="qa-icon">📥</div><span>결재함</span>
-        </div>
-        <div class="quick-action" onclick="showPage('myDocs',null)">
-          <div class="qa-icon">📂</div><span>내 문서함</span>
-        </div>
-        <div class="quick-action" onclick="showPage('notice',null)">
-          <div class="qa-icon">📢</div><span>공지사항</span>
-        </div>
-        <div class="quick-action" onclick="showPage('approvalLine',null)">
-          <div class="qa-icon">🔗</div><span>결재라인</span>
-        </div>
-        <div class="quick-action admin-only" id="qaOrgChart" onclick="showPage('orgChart',null)">
-          <div class="qa-icon">🏢</div><span>조직도</span>
-        </div>
-      </div>
       <div class="card" style="margin-bottom:20px">
         <div class="card-header"><h3>📢 최근 공지사항</h3><button class="btn btn-sm btn-outline" onclick="showPage('notice',null)">전체보기</button></div>
         <div class="card-body" id="dashNoticeList"></div>
