@@ -443,6 +443,18 @@ canvas#sigCanvas { display:block; cursor:crosshair; touch-action:none; }
 .cal-td.sat-col .cal-date-num { color:#3498db; }
 .cal-cell-ta { width:100%; border:none; outline:none; resize:none; background:transparent; font-size:10.5px; font-family:inherit; line-height:1.45; color:var(--text); padding:0; height:56px; overflow-y:auto; }
 .cal-cell-ta:focus { background:rgba(26,58,92,0.04); border-radius:2px; }
+/* 년/월 피커 */
+.cal-picker-wrap { position:relative; }
+.cal-title-btn { background:none; border:none; font-weight:700; font-size:14px; color:var(--primary); cursor:pointer; padding:3px 8px; border-radius:var(--radius-sm); display:flex; align-items:center; gap:4px; transition:background .15s; font-family:inherit; }
+.cal-title-btn:hover { background:rgba(26,58,92,0.08); }
+.cal-title-btn .cal-title-arrow { font-size:10px; color:var(--text-muted); }
+.cal-picker { position:absolute; top:calc(100% + 6px); left:50%; transform:translateX(-50%); z-index:300; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-lg); padding:14px 12px; width:210px; }
+.cal-picker-yr-nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.cal-picker-yr { font-weight:700; font-size:14px; color:var(--primary); }
+.cal-picker-months { display:grid; grid-template-columns:repeat(4,1fr); gap:5px; }
+.cal-picker-mo { padding:7px 2px; text-align:center; border-radius:var(--radius-sm); cursor:pointer; font-size:12px; border:1.5px solid transparent; transition:all .15s; color:var(--text); }
+.cal-picker-mo:hover { background:rgba(26,58,92,0.08); border-color:var(--primary); color:var(--primary); }
+.cal-picker-mo.cur { background:var(--primary); color:#fff; font-weight:700; border-color:var(--primary); }
 
 /* DASHBOARD QUICK */
 .quick-actions { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px; margin-bottom:24px; }
@@ -2091,6 +2103,10 @@ const _calState = {
   all:  { year: new Date().getFullYear(), month: new Date().getMonth() },
   team: { year: new Date().getFullYear(), month: new Date().getMonth() }
 };
+const _pickerState = {
+  all:  { show: false, pickYear: new Date().getFullYear() },
+  team: { show: false, pickYear: new Date().getFullYear() }
+};
 const _MONTH_NAMES = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
 
 function renderCal(type) {
@@ -2185,11 +2201,37 @@ function renderCal(type) {
     </div>`;
   })() : '';
 
+  // 년/월 피커 HTML
+  const p = _pickerState[type];
+  if (p.show) p.pickYear = p.pickYear || y; // 최초 열릴 때 현재 년도 초기화
+  let pickerHtml = '';
+  if (p.show) {
+    let moButtons = '';
+    for (let m = 0; m < 12; m++) {
+      const isCur = p.pickYear === y && m === mo;
+      moButtons += `<div class="cal-picker-mo${isCur?' cur':''}" onclick="calPickerSelect('${type}',${m});event.stopPropagation()">${m+1}월</div>`;
+    }
+    pickerHtml = `
+      <div class="cal-picker" onclick="event.stopPropagation()">
+        <div class="cal-picker-yr-nav">
+          <button class="cal-nav-btn" onclick="calPickerYear('${type}',-1)">&#8249;</button>
+          <span class="cal-picker-yr">${p.pickYear}년</span>
+          <button class="cal-nav-btn" onclick="calPickerYear('${type}',1)">&#8250;</button>
+        </div>
+        <div class="cal-picker-months">${moButtons}</div>
+      </div>`;
+  }
+
   wrap.innerHTML = `
     ${teamSel}
     <div class="cal-nav">
       <button class="cal-nav-btn" onclick="calMove('${type}',-1)">&#8249;</button>
-      <span class="cal-title">${y}년 ${_MONTH_NAMES[mo]}</span>
+      <div class="cal-picker-wrap">
+        <button class="cal-title-btn" onclick="calTogglePicker('${type}');event.stopPropagation()">
+          ${y}년 ${_MONTH_NAMES[mo]} <span class="cal-title-arrow">▾</span>
+        </button>
+        ${pickerHtml}
+      </div>
       <button class="cal-nav-btn" onclick="calMove('${type}',1)">&#8250;</button>
     </div>
     <table class="cal-table">
@@ -2209,6 +2251,45 @@ function calMove(type, dir) {
   if (s.month > 11) { s.month = 0;  s.year++; }
   renderCal(type);
 }
+
+// 년/월 피커 토글
+function calTogglePicker(type) {
+  const p = _pickerState[type];
+  const wasOpen = p.show;
+  // 다른 피커 닫기
+  ['all','team'].forEach(t => { _pickerState[t].show = false; });
+  if (!wasOpen) {
+    p.show = true;
+    p.pickYear = _calState[type].year;
+  }
+  renderCal('all');
+  renderCal('team');
+}
+
+// 피커 내 년도 이동
+function calPickerYear(type, dir) {
+  _pickerState[type].pickYear += dir;
+  renderCal(type);
+}
+
+// 피커에서 월 선택
+function calPickerSelect(type, month) {
+  const p = _pickerState[type];
+  _calState[type].year  = p.pickYear;
+  _calState[type].month = month;
+  p.show = false;
+  renderCal(type);
+}
+
+// 외부 클릭 시 피커 닫기
+document.addEventListener('click', () => {
+  if (_pickerState.all.show || _pickerState.team.show) {
+    _pickerState.all.show  = false;
+    _pickerState.team.show = false;
+    renderCal('all');
+    renderCal('team');
+  }
+});
 
 // textarea blur 시 자동 저장 (권한 확인 포함)
 function calAutoSave(type, ds, value, team) {
