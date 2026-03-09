@@ -1112,11 +1112,11 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
         <div class="card admin-only">
           <div class="card-header"><h3>🏢 회사 정보</h3></div>
           <div class="card-body">
-            <div class="form-group"><label>회사명</label><input type="text" id="settingCompany" value="주식회사 케어플러스"></div>
-            <div class="form-group"><label>대표자</label><input type="text" id="settingCeo" value="김대표"></div>
-            <div class="form-group"><label>주소</label><input type="text" id="settingAddr" value="서울특별시 강남구 테헤란로 123"></div>
-            <div class="form-group"><label>대표전화</label><input type="tel" id="settingPhone" value="02-1234-5678"></div>
-            <button class="btn btn-primary" onclick="showToast('회사 정보가 저장되었습니다.','success')">💾 저장</button>
+            <div class="form-group"><label>회사명</label><input type="text" id="settingCompany"></div>
+            <div class="form-group"><label>대표자</label><input type="text" id="settingCeo"></div>
+            <div class="form-group"><label>주소</label><input type="text" id="settingAddr"></div>
+            <div class="form-group"><label>대표전화</label><input type="tel" id="settingPhone"></div>
+            <button class="btn btn-primary" onclick="saveCompanyInfo()">💾 저장</button>
           </div>
         </div>
         <div class="card admin-only">
@@ -1596,6 +1596,7 @@ function sbId(type, itemId) {
   if (type === 'notices') return 'notice-' + itemId;
   if (type === 'lines') return 'line-' + itemId;
   if (type === 'depts') return 'dept-' + itemId;
+  if (type === 'settings') return 'settings-' + itemId;
   return String(itemId); // docs, templates
 }
 
@@ -1634,6 +1635,7 @@ async function loadFromSupabase() {
       if (byType.lines && byType.lines.length)     DB.lines     = byType.lines;
       if (byType.depts && byType.depts.length)     DB.depts     = byType.depts;
       if (byType.templates && byType.templates.length) DB.templates = byType.templates;
+      if (byType.settings && byType.settings.length) DB.settings = byType.settings[0];
     } else {
       // 최초 실행: 기본 데이터를 Supabase에 저장
       await seedSupabase();
@@ -1725,6 +1727,7 @@ async function fullSyncSupabase() {
     if (byType.lines)     DB.lines     = byType.lines;
     if (byType.depts)     DB.depts     = byType.depts;
     if (byType.templates) DB.templates = byType.templates;
+    if (byType.settings && byType.settings.length) DB.settings = byType.settings[0];
     _lastSyncTime = new Date().toISOString();
     refreshCurrentPage();
     updateBadge();
@@ -1810,6 +1813,8 @@ function applyDBChange(type, data) {
   } else if (type === 'templates') {
     const idx = DB.templates.findIndex(t => t.id === data.id);
     if (idx > -1) DB.templates[idx] = data; else DB.templates.push(data);
+  } else if (type === 'settings') {
+    DB.settings = data;
   }
 }
 
@@ -1874,7 +1879,13 @@ const DB = {
     {name:'재활팀', code:'REHAB', head:'user5'},
     {name:'영양팀', code:'FOOD', head:''},
   ],
-  templates: []  // 서식 항목: {id, name, docType, content, updatedAt}
+  templates: [],  // 서식 항목: {id, name, docType, content, updatedAt}
+  settings: {     // 회사 정보
+    companyName: '주식회사 케어플러스',
+    ceo: '김대표',
+    addr: '서울특별시 강남구 테헤란로 123',
+    phone: '02-1234-5678'
+  }
 };
 
 let currentUser = null;
@@ -1999,6 +2010,7 @@ function showPage(name, navEl) {
   if (name==='orgChart') loadOrgChart();
   if (name==='templates') loadTemplates();
   if (name==='members') loadMembers();
+  if (name==='settings') loadCompanySettings();
 }
 
 // ============================================================
@@ -2838,7 +2850,7 @@ function printDoc(docId) {
   const writer = getUser(doc.writer);
   const now = new Date().toLocaleString('ko-KR');
   const opinions = doc.approvers.filter(a=>a.opinion&&a.opinion.trim());
-  const companyName = document.getElementById('settingCompany')?.value || '주식회사 케어플러스';
+  const companyName = (DB.settings && DB.settings.companyName) || '주식회사 케어플러스';
   const urgencyText = {normal:'일반', urgent:'긴급', 'very-urgent':'매우긴급'}[doc.urgency] || '일반';
   const statusText = {approved:'결재완료', rejected:'반려', pending:'진행중', draft:'임시저장'}[doc.status] || '-';
 
@@ -3450,6 +3462,24 @@ function saveSettings() {
   sbSave('users', currentUser.id, currentUser);
   document.getElementById('sideUserName').textContent = currentUser.name;
   showToast('설정이 저장되었습니다.','success');
+}
+function saveCompanyInfo() {
+  DB.settings = {
+    companyName: document.getElementById('settingCompany').value,
+    ceo: document.getElementById('settingCeo').value,
+    addr: document.getElementById('settingAddr').value,
+    phone: document.getElementById('settingPhone').value
+  };
+  sbSave('settings', 'company', DB.settings);
+  showToast('회사 정보가 저장되었습니다.','success');
+}
+function loadCompanySettings() {
+  const s = DB.settings || {};
+  const el = id => document.getElementById(id);
+  if (el('settingCompany')) el('settingCompany').value = s.companyName || '';
+  if (el('settingCeo'))     el('settingCeo').value     = s.ceo         || '';
+  if (el('settingAddr'))    el('settingAddr').value     = s.addr        || '';
+  if (el('settingPhone'))   el('settingPhone').value    = s.phone       || '';
 }
 function changePw() {
   const cur = document.getElementById('settingCurPw').value;
