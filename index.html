@@ -650,13 +650,13 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
       <!-- 달력 메모 패널 (맨 위 첫 번째 행) -->
       <div class="grid-2" style="margin-bottom:20px">
         <div class="card">
-          <div class="card-header"><h3>📅 전체 공지 메모</h3><span style="font-size:11px;color:var(--text-muted)">날짜를 클릭해 메모를 남기세요</span></div>
+          <div class="card-header"><h3>📅 전체 월간 행사</h3><span style="font-size:11px;color:var(--text-muted)">관리자만 입력 가능합니다</span></div>
           <div class="card-body" style="padding:16px">
             <div id="calAllWrap"></div>
           </div>
         </div>
         <div class="card">
-          <div class="card-header"><h3>📅 팀별 공지 메모</h3><span style="font-size:11px;color:var(--text-muted)">팀을 선택한 뒤 날짜를 클릭하세요</span></div>
+          <div class="card-header"><h3>📅 팀별 월간 행사</h3><span style="font-size:11px;color:var(--text-muted)">관리자 및 해당 팀장만 입력 가능합니다</span></div>
           <div class="card-body" style="padding:16px">
             <div id="calTeamWrap"></div>
           </div>
@@ -2101,6 +2101,20 @@ function renderCal(type) {
   const team = type === 'team'
     ? (document.getElementById('calTeamSel')?.value || DB.depts[0]?.name || '')
     : null;
+
+  // 권한 체크
+  const isAdmin = currentUser?.role === 'admin';
+  let canEdit = false;
+  if (type === 'all') {
+    canEdit = isAdmin;
+  } else {
+    // 팀별: 관리자 또는 해당 팀의 팀장
+    const dept = DB.depts.find(d => d.name === team);
+    canEdit = isAdmin || (dept && dept.head === currentUser?.id);
+  }
+  const readonlyAttr = canEdit ? '' : 'readonly';
+  const taStyle = canEdit ? '' : 'cursor:default;color:var(--text-sub);';
+
   const today = new Date();
   const y = s.year, mo = s.month;
   const firstDow  = new Date(y, mo, 1).getDay();   // 0=일
@@ -2135,10 +2149,11 @@ function renderCal(type) {
     ].filter(Boolean).join(' ');
     const content = (memoMap[ds] || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     const targ = team ? `, \`${team}\`` : '';
+    const blurHandler = canEdit ? `onblur="calAutoSave('${type}','${ds}',this.value${targ})"` : '';
 
     cells += `<td class="${tdCls}">
       <div class="cal-date-num">${d}</div>
-      <textarea class="cal-cell-ta" onblur="calAutoSave('${type}','${ds}',this.value${targ})">${content}</textarea>
+      <textarea class="cal-cell-ta" ${readonlyAttr} style="${taStyle}" ${blurHandler}>${content}</textarea>
     </td>`;
     col++;
 
@@ -2155,10 +2170,20 @@ function renderCal(type) {
     rows += `<tr>${cells}</tr>`;
   }
 
-  const teamSel = type === 'team' ? `
-    <select class="cal-team-sel" id="calTeamSel" onchange="renderCal('team')">
-      ${DB.depts.map(d => `<option value="${d.name}"${d.name === team ? ' selected' : ''}>${d.name}</option>`).join('')}
-    </select>` : '';
+  const teamSel = type === 'team' ? (() => {
+    const dept = DB.depts.find(d => d.name === team);
+    const headUser = dept?.head ? getUser(dept.head) : null;
+    const permLabel = canEdit
+      ? `<span style="font-size:11px;color:var(--success)">✏️ 입력 가능</span>`
+      : `<span style="font-size:11px;color:var(--text-muted)">👁 읽기 전용${headUser ? ' (팀장: ' + headUser.name + ')' : ''}</span>`;
+    return `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <select class="cal-team-sel" id="calTeamSel" onchange="renderCal('team')" style="margin-bottom:0;flex:1">
+        ${DB.depts.map(d => `<option value="${d.name}"${d.name === team ? ' selected' : ''}>${d.name}</option>`).join('')}
+      </select>
+      ${permLabel}
+    </div>`;
+  })() : '';
 
   wrap.innerHTML = `
     ${teamSel}
@@ -2185,8 +2210,16 @@ function calMove(type, dir) {
   renderCal(type);
 }
 
-// textarea blur 시 자동 저장
+// textarea blur 시 자동 저장 (권한 확인 포함)
 function calAutoSave(type, ds, value, team) {
+  // 권한 재확인
+  const isAdmin = currentUser?.role === 'admin';
+  if (type === 'all' && !isAdmin) return;
+  if (type === 'team') {
+    const dept = DB.depts.find(d => d.name === team);
+    if (!isAdmin && !(dept && dept.head === currentUser?.id)) return;
+  }
+
   const content = value.trim();
   const arr    = type === 'all' ? DB.memoAll : DB.memoTeam;
   const sbType = type === 'all' ? 'memoAll' : 'memoTeam';
