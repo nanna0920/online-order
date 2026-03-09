@@ -2558,22 +2558,17 @@ function loadDashboard() {
 
   // Notices
   const nl = document.getElementById('dashNoticeList');
-  const sortedNotices = [...DB.notices].sort((a,b)=>{
-    if (a.pin && !b.pin) return -1;
-    if (!a.pin && b.pin) return 1;
-    return b.date.localeCompare(a.date);
-  });
+  const sortedNotices = [...DB.notices].sort((a,b) => b.pin - a.pin || b.id - a.id);
   if (sortedNotices.length === 0) {
-    nl.innerHTML = '<p style="color:var(--text-muted);font-size:13px;padding:12px 0">등록된 공지사항이 없습니다.</p>';
+    nl.innerHTML = '<div class="empty-state"><div class="icon">📢</div><p>등록된 공지사항이 없습니다.</p></div>';
   } else {
-    nl.innerHTML = sortedNotices.slice(0,5).map(n=>`
-      <div style="padding:14px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="showNoticeDetail(${n.id})">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-          ${n.pin?'<span style="font-size:12px;color:#e74c3c;font-weight:700">📌 공지</span>':''}
-          <span style="font-size:14px;font-weight:600;color:var(--text)">${n.title}</span>
+    nl.innerHTML = sortedNotices.slice(0, 10).map(n => `
+      <div class="notice-item" onclick="showNoticeDetail(${n.id})">
+        ${n.pin ? '<span class="notice-pin">📌 중요</span>' : '<div style="width:46px"></div>'}
+        <div style="flex:1">
+          <div class="notice-title">${n.title}${n.category ? ` <span class="chip" style="font-size:11px;margin-left:6px">${n.category}</span>` : ''}</div>
+          <div class="notice-meta">${n.date} · ${getUser(n.author)?.name||n.author} · ${getUser(n.author)?.pos||''}</div>
         </div>
-        <div style="font-size:13px;color:var(--text-sub);white-space:pre-line;line-height:1.6;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${n.content||''}</div>
-        <div style="font-size:12px;color:var(--text-muted)">${n.date} · ${getUser(n.author)?.name||n.author}</div>
       </div>`).join('');
   }
 }
