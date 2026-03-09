@@ -726,6 +726,7 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
     <!-- ===== WRITE DOC ===== -->
     <div class="page" id="page-writeDoc">
       <!-- 숨겨진 데이터 필드 -->
+      <input type="hidden" id="docTitle">
       <span style="display:none" id="docWriter"></span>
       <span style="display:none" id="docDate"></span>
       <span style="display:none" id="docDept"></span>
@@ -2783,8 +2784,8 @@ function clearDocForm() {
   selectedApprovers=[];
   renderDocApprovalLine();
   _setWriteDocHeader(false);
-  _setDocFormMode(null); // 서식 모드 해제
-  openDocFormSelect();
+  _setDocFormMode(null);
+  openDocFormSelect(); // 양식 선택 화면으로
 }
 
 // ============================================================
@@ -2962,9 +2963,8 @@ function submitDoc() {
   const title = document.getElementById('docTitle').value.trim();
   const editorEl = document.getElementById('docContent');
   const content = serializeEditorHTML(editorEl);
-  const contentText = editorEl.innerText.trim();
-  if (!title) { showToast('제목을 입력하세요.','error'); return; }
-  if (!contentText) { showToast('내용을 입력하세요.','error'); return; }
+  if (!title) { showToast('양식을 선택하고 다시 시도하세요.','error'); return; }
+  if (!editorEl.innerHTML.trim()) { showToast('내용을 입력하세요.','error'); return; }
   if (selectedApprovers.length===0) { showToast('결재자를 최소 1명 추가하세요.','error'); return; }
 
   const approvers = selectedApprovers.map((uid,i)=>({
@@ -3014,8 +3014,11 @@ function submitDoc() {
   renderDocApprovalLine();
   document.getElementById('docTitle').value='';
   document.getElementById('docContent').innerHTML='';
+  _setDocFormMode(null);
   updateBadge();
-  showPage('myDocs',null);
+  // 양식 선택 화면으로 리셋 후 내 문서함으로 이동
+  openDocFormSelect();
+  showPage('myDocs', null);
 }
 
 // ============================================================
