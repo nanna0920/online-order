@@ -238,7 +238,7 @@ canvas#sigCanvas { display:block; cursor:crosshair; touch-action:none; }
 .doc-body-area textarea { width:100%; min-height:280px; border:none; outline:none; resize:vertical; font-size:14px; font-family:inherit; line-height:1.8; color:var(--text); }
 /* 문서기안 에디터 툴바 */
 .doc-editor-toolbar { display:flex; flex-wrap:wrap; gap:3px; padding:8px 12px; background:var(--surface2); border-bottom:1.5px solid var(--border); }
-.doc-editor-area { min-height:320px; padding:20px 22px; outline:none; font-size:14px; line-height:2; font-family:inherit; color:var(--text); overflow-y:auto; background:#fff; }
+.doc-editor-area { min-height:320px; padding:20px 22px 40px; outline:none; font-size:14px; line-height:2; font-family:inherit; color:var(--text); overflow-y:visible; background:#fff; }
 .doc-editor-area:empty:before { content:attr(data-placeholder); color:var(--text-muted); pointer-events:none; }
 .doc-editor-area table { border-collapse:collapse; width:100%; margin:10px 0; }
 .doc-editor-area table td, .doc-editor-area table th { border:1px solid #aaa; padding:6px 10px; min-width:60px; }
@@ -432,7 +432,7 @@ canvas#sigCanvas { display:block; cursor:crosshair; touch-action:none; }
 .doc-form-select-name { font-size:15px;font-weight:700;color:var(--text); }
 .doc-form-select-desc { font-size:11px;color:var(--text-sub);text-align:center; }
 /* 기안 서식 테이블 */
-.form-table { width:100%;border-collapse:collapse;margin-top:12px;font-size:13px; }
+.form-table { width:100%;border-collapse:collapse;margin-top:12px;margin-bottom:20px;font-size:13px; }
 .form-table th,.form-table td { border:1px solid #b0b8c1;padding:7px 10px; }
 .form-table th { background:#f0f4f8;font-weight:600;color:var(--text-sub);white-space:nowrap;width:120px; }
 .form-table td { background:#fff;min-width:160px;cursor:text; }
