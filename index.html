@@ -2839,8 +2839,12 @@ function openDocFormSelect() {
 }
 
 function toggleFormChk(el) {
-  el.classList.toggle('checked');
-  el.textContent = el.classList.contains('checked') ? 'V' : '';
+  const td = el.closest('td');
+  if (td) {
+    td.querySelectorAll('.form-chk').forEach(c => { c.classList.remove('checked'); c.textContent = ''; });
+  }
+  el.classList.add('checked');
+  el.textContent = 'V';
 }
 
 function _setDocFormMode(formName) {
