@@ -2119,8 +2119,10 @@ function renderCal(type) {
   const wrap = document.getElementById(type === 'all' ? 'calAllWrap' : 'calTeamWrap');
   if (!wrap) return;
 
+  // 팀 결정: 이미 선택된 값 → 내가 팀장인 팀 → 첫 번째 팀 순으로 fallback
+  const myHeadTeam = DB.depts.find(d => d.head === currentUser?.id)?.name || '';
   const team = type === 'team'
-    ? (document.getElementById('calTeamSel')?.value || DB.depts[0]?.name || '')
+    ? (document.getElementById('calTeamSel')?.value || myHeadTeam || DB.depts[0]?.name || '')
     : null;
 
   // 권한 체크
@@ -2194,9 +2196,10 @@ function renderCal(type) {
   const teamSel = type === 'team' ? (() => {
     const dept = DB.depts.find(d => d.name === team);
     const headUser = dept?.head ? getUser(dept.head) : null;
+    const headName = headUser?.name || '-';
     const permLabel = canEdit
-      ? `<span style="font-size:11px;color:var(--success)">✏️ 입력 가능</span>`
-      : `<span style="font-size:11px;color:var(--text-muted)">👁 읽기 전용${headUser ? ' (팀장: ' + headUser.name + ')' : ''}</span>`;
+      ? `<span style="font-size:11px;color:var(--success);white-space:nowrap">✏️ ${headName} (작성 가능)</span>`
+      : `<span style="font-size:11px;color:var(--text-muted);white-space:nowrap">👁 팀장: ${headName}</span>`;
     return `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
       <select class="cal-team-sel" id="calTeamSel" onchange="renderCal('team')" style="margin-bottom:0;flex:1">
