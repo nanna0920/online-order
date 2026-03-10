@@ -305,16 +305,19 @@ canvas#sigCanvas { display:block; cursor:crosshair; touch-action:none; }
   /* 테이블 테두리 강제 출력 */
   #printModalArea table { border-collapse:collapse !important; }
   #printModalArea table td,
-  #printModalArea table th { border:1.5px solid #333 !important; }
-  #printModalArea .pd-approval-table th { background:#1a3a5c !important; color:#fff !important; print-color-adjust:exact; -webkit-print-color-adjust:exact; }
-  #printModalArea .pd-approval-table .ap-row-label { background:#f0f4f8 !important; color:#1a3a5c !important; print-color-adjust:exact; -webkit-print-color-adjust:exact; }
-  #printModalArea .pd-meta-table td.lbl { background:#f0f4f8 !important; print-color-adjust:exact; -webkit-print-color-adjust:exact; }
-  #printModalArea .pd-divider-top { border-top:3px solid #1a3a5c !important; display:block !important; }
-  #printModalArea .pd-divider-bot { border-top:1px solid #1a3a5c !important; display:block !important; }
-  #printModalArea .pd-body-content { border:none !important; }
+  #printModalArea table th { border:1.5px solid #000 !important; color:#000 !important; }
+  /* form-table 헤더 */
+  #printModalArea .form-table th { background:#eee !important; color:#000 !important; print-color-adjust:exact; -webkit-print-color-adjust:exact; }
+  /* 결재란 직위·결재 레이블은 흰 글자 유지 (검정 배경) */
+  #printModalArea table td[style*="background:#000"],
+  #printModalArea table th[style*="background:#000"] { color:#fff !important; print-color-adjust:exact; -webkit-print-color-adjust:exact; }
   #printModalArea .pd-body-no-date .form-sub { display:none !important; }
-  #printModalArea .pd-opinion-item { border:1px solid #999 !important; }
   #printModalArea hr { display:block !important; }
+  /* 인쇄 시에도 구조 유지 */
+  #printModalArea { display:flex !important; flex-direction:column !important; }
+  #printModalArea .pd-body-no-date { flex:1 !important; display:flex !important; flex-direction:column !important; }
+  #printModalArea .pd-body-no-date .form-table { font-size:15px !important; }
+  #printModalArea .pd-body-no-date .form-table tr:last-child td { border-bottom:1px solid #000 !important; vertical-align:top !important; }
 }
 
 /* PRINT PREVIEW MODAL */
@@ -330,7 +333,34 @@ canvas#sigCanvas { display:block; cursor:crosshair; touch-action:none; }
 #printModalArea {
   print-color-adjust: exact;
   -webkit-print-color-adjust: exact;
+  color: #000;
+  display: flex;
+  flex-direction: column;
 }
+#printModalArea .pd-body-no-date {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+/* form-table: JS로 높이 제어, CSS flex 제거 */
+#printModalArea .pd-body-no-date .form-table {
+  width: 100%;
+  font-size: 15px;
+}
+#printModalArea .pd-body-no-date .form-table td,
+#printModalArea .pd-body-no-date .form-table th {
+  vertical-align: middle;
+}
+#printModalArea .pd-body-no-date .form-table tr:last-child td {
+  border-bottom: 1px solid #000 !important;
+  vertical-align: top;
+}
+/* 미리보기 화면에서도 글자·테이블 모두 검정 */
+#printModalArea table td,
+#printModalArea table th { border-color:#000 !important; color:#000; }
+#printModalArea .form-table { border-bottom-color:#000 !important; }
+#printModalArea .form-table th { background:#eee; color:#000; }
+#printModalArea .form-table td { color:#000; }
 .pd-company { text-align:center; font-size:20pt; color:#1a3a5c; font-weight:700; margin-bottom:8px; letter-spacing:1px; font-family:'Noto Serif KR',serif; }
 .pd-title { text-align:center; font-family:'Noto Serif KR',serif; font-size:15pt; font-weight:600; color:#1a3a5c; margin-bottom:6px; }
 .pd-divider-top { display:block; height:0; border:none; border-top:3px solid #1a3a5c !important; margin:10px 0 0; }
@@ -2867,7 +2897,7 @@ function selectDocForm(formName) {
   <tr><th>휴가 사유</th><td ${ce} colspan="3" style="height:72px"></td></tr>
   <tr><th>비고</th><td ${ce} colspan="3"></td></tr>
 </table>
-<p style="margin-top:16px;font-size:13px;color:#555;">위와 같이 휴가를 신청합니다.</p>`,
+<p style="margin-top:16px;font-size:20px;color:#555;">위와 같이 휴가를 신청합니다.</p>`,
 
     '외출신청서': `
 <div class="form-title">외출신청서</div>
@@ -2881,7 +2911,7 @@ function selectDocForm(formName) {
   <tr><th>외출 목적</th><td ${ce} colspan="3" style="height:72px"></td></tr>
   <tr><th>비고</th><td ${ce} colspan="3"></td></tr>
 </table>
-<p style="margin-top:16px;font-size:13px;color:#555;">위와 같이 외출을 신청합니다.</p>`,
+<p style="margin-top:16px;font-size:20px;color:#555;">위와 같이 외출을 신청합니다.</p>`,
 
     '교육신청서': `
 <div class="form-title">교육신청서</div>
@@ -2897,7 +2927,7 @@ function selectDocForm(formName) {
   <tr><th>교육 목적</th><td ${ce} colspan="3" style="height:72px"></td></tr>
   <tr><th>비고</th><td ${ce} colspan="3"></td></tr>
 </table>
-<p style="margin-top:16px;font-size:13px;color:#555;">위와 같이 교육 참가를 신청합니다.</p>`,
+<p style="margin-top:16px;font-size:20px;color:#555;">위와 같이 교육 참가를 신청합니다.</p>`,
 
     '근무변경신청서': `
 <div class="form-title">근무변경신청서</div>
@@ -2911,7 +2941,7 @@ function selectDocForm(formName) {
   <tr><th>변경 사유</th><td ${ce} colspan="3" style="height:72px"></td></tr>
   <tr><th>비고</th><td ${ce} colspan="3"></td></tr>
 </table>
-<p style="margin-top:16px;font-size:13px;color:#555;">위와 같이 근무 변경을 신청합니다.</p>`
+<p style="margin-top:16px;font-size:20px;color:#555;">위와 같이 근무 변경을 신청합니다.</p>`
   };
 
   const html = templates[formName] || '';
@@ -3075,7 +3105,7 @@ function renderMyDocs(filter) {
       <td>
         <button class="btn btn-sm btn-outline" onclick="viewDoc('${d.id}')">상세</button>
         ${d.status==='approved'?`<button class="btn btn-sm btn-accent" style="background:#1a3a5c;color:#fff" onclick="printDoc('${d.id}')">🖨️ 출력</button>`:''}
-        ${d.status==='draft'?`<button class="btn btn-sm btn-primary" onclick="editDoc('${d.id}')">✏️ 수정</button>`:''}
+        ${d.status==='draft'&&currentUser?.role==='admin'?`<button class="btn btn-sm btn-primary" onclick="editDoc('${d.id}')">✏️ 수정</button>`:''}
         ${d.status==='draft'?`<button class="btn btn-sm btn-danger" onclick="deleteDoc('${d.id}')">삭제</button>`:''}
       </td>
     </tr>`).join('');
@@ -3084,9 +3114,9 @@ function renderMyDocs(filter) {
 function editDoc(docId) {
   const doc = DB.docs.find(d=>d.id===docId);
   if (!doc) return;
-  // 관리자는 모든 문서 수정 가능, 일반 사용자는 본인의 draft만
+  // 관리자만 수정 가능
   const isAdmin = currentUser && currentUser.role === 'admin';
-  if (!isAdmin && (doc.writer !== currentUser.id || doc.status !== 'draft')) return;
+  if (!isAdmin) { showToast('관리자만 문서를 수정할 수 있습니다.', 'warning'); return; }
   editingDocId = docId;
   // 폼에 기존 데이터 로드
   document.getElementById('docTitle').value = doc.title;
@@ -3157,9 +3187,9 @@ function renderApprovalBox(filter) {
   if (filter==='pending') {
     docs = DB.docs.filter(d=>!d.draft&&d.approvers.some(a=>a.id===currentUser.id&&a.status==='pending'));
   } else if (filter==='waiting') {
-    docs = DB.docs.filter(d=>!d.draft&&d.approvers.some(a=>a.id===currentUser.id&&a.status==='waiting'));
+    docs = DB.docs.filter(d=>!d.draft&&d.approvers.some(a=>a.id===currentUser.id&&(a.status==='waiting'||a.status==='pending')));
   } else {
-    docs = DB.docs.filter(d=>!d.draft&&d.approvers.some(a=>a.id===currentUser.id&&(a.status==='approved'||a.status==='rejected')));
+    docs = DB.docs.filter(d=>!d.draft&&d.approvers.some(a=>a.id===currentUser.id&&(a.status==='approved'||a.status==='rejected'||a.status==='pending')));
   }
   const tbody = document.getElementById('approvalTbody');
   const emptyMsg = filter==='pending'?'결재 대기 문서가 없습니다.':filter==='waiting'?'결재 예정 문서가 없습니다.':'처리한 문서가 없습니다.';
@@ -3259,7 +3289,57 @@ function viewDoc(docId) {
     </div>
   `;
 
-    openModal('docViewModal');
+  // 모달 푸터 버튼 구성
+  const footer = document.getElementById('modalDocFooter');
+  if (isApprover) {
+    footer.innerHTML = `
+      <button class="btn btn-success" style="min-width:100px" onclick="processApproval('${doc.id}','approved')">✅ 결재</button>
+      <button class="btn btn-danger"  style="min-width:100px" onclick="processApproval('${doc.id}','rejected')">❌ 반려</button>
+      <button class="btn btn-secondary" onclick="closeModal('docViewModal')">닫기</button>
+    `;
+  } else {
+    const canPrint = doc.status === 'approved';
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    const isWriter = doc.writer === currentUser.id;
+    const canEditDelete = isAdmin;
+    footer.innerHTML = `
+      ${canPrint ? `<button class="btn btn-outline" onclick="closeThenPrint('${doc.id}')">🖨️ 출력</button>` : ''}
+      ${canEditDelete ? `<button class="btn btn-primary" onclick="forceEditDoc('${doc.id}')">✏️ 수정</button>` : ''}
+      ${canEditDelete ? `<button class="btn btn-danger"  onclick="deleteDocFromApproval('${doc.id}')">🗑️ 삭제</button>` : ''}
+      <button class="btn btn-secondary" onclick="closeModal('docViewModal')">닫기</button>
+    `;
+  }
+
+  openModal('docViewModal');
+}
+
+function quickProcessApproval(docId, action) {
+  const doc = DB.docs.find(d=>d.id===docId);
+  if (!doc) return;
+  const approver = doc.approvers.find(a=>a.id===currentUser.id&&a.status==='pending');
+  if (!approver) { showToast('결재 권한이 없습니다.','warning'); return; }
+  const label = action==='approved'?'승인':'반려';
+  if (!confirm(`"${doc.title}" 문서를 ${label}하시겠습니까?`)) return;
+  approver.status = action;
+  approver.date = new Date().toLocaleDateString('ko-KR').replaceAll('. ','-').replace('.','');
+  approver.opinion = '';
+  if (action==='rejected') {
+    doc.status = 'rejected';
+    showToast(`"${doc.title}" 문서를 반려하였습니다.`,'warning');
+  } else {
+    const nextApprover = doc.approvers.find(a=>a.status==='waiting');
+    if (nextApprover) {
+      nextApprover.status = 'pending';
+      doc.status = 'pending';
+      showToast(`"${doc.title}" 문서를 승인하였습니다.`,'success');
+    } else {
+      doc.status = 'approved';
+      showToast(`"${doc.title}" 최종 결재가 완료되었습니다! ✅`,'success');
+    }
+  }
+  sbSave('docs', docId, doc);
+  loadApprovalBox();
+  updateBadge();
 }
 
 function processApproval(docId, action) {
@@ -3308,6 +3388,13 @@ function renderDocContent(htmlContent) {
 
   // contenteditable 제거
   tmp.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+
+  // form-chk 스팬 체크박스: 클릭 불가 처리
+  tmp.querySelectorAll('.form-chk').forEach(el => {
+    el.removeAttribute('onclick');
+    el.style.pointerEvents = 'none';
+    el.style.cursor = 'default';
+  });
 
   // 체크박스: 기존 요소를 새 요소로 교체하여 checked 상태를 확실히 보존
   tmp.querySelectorAll('input[type="checkbox"]').forEach(chk => {
@@ -3358,24 +3445,38 @@ function printDoc(docId) {
   const urgencyText = {normal:'일반', urgent:'긴급', 'very-urgent':'매우긴급'}[doc.urgency] || '일반';
   const statusText = {approved:'결재완료', rejected:'반려', pending:'진행중', draft:'임시저장'}[doc.status] || '-';
 
-  // 결재란 구성
-  const approverHeaders = doc.approvers.map(a => `<th>${a.pos}<br><span style="font-weight:400">${a.name}</span></th>`).join('');
-  const approverCells = doc.approvers.map(a => {
+  // 인라인 스타일로 결재란 구성 (CSS 클래스 의존 없이)
+  const BS = 'border:1px solid #000;';
+  const COL_W = '3cm';
+  const SIG_IMG_H = '1.2cm'; // 서명 이미지 높이 (2.4cm의 50%)
+
+  // 직위 행 (연한 하늘색 배경)
+  const apPos = doc.approvers.map(a =>
+    `<td style="${BS}text-align:center;font-size:15px;font-weight:700;width:${COL_W};padding:4px 2px;background:#cce8ff;color:#000;print-color-adjust:exact;-webkit-print-color-adjust:exact">${a.pos}</td>`
+  ).join('');
+
+  // 이름 행 (연한 노란색 배경)
+  const apName = doc.approvers.map(a =>
+    `<td style="${BS}text-align:center;font-size:13px;font-weight:600;width:${COL_W};padding:4px 2px;background:#fffde0;color:#000;print-color-adjust:exact;-webkit-print-color-adjust:exact">${a.name}</td>`
+  ).join('');
+
+  // 서명 행 - 칸 안에 잘림 없이 전체 표시
+  const apCells = doc.approvers.map(a => {
     const approverUser = DB.users.find(u=>u.id===a.id);
     const sigImg = approverUser && approverUser.sigData
-      ? `<img src="${approverUser.sigData}" class="ap-sig-img" alt="서명">`
+      ? `<img src="${approverUser.sigData}" style="width:calc(${COL_W} - 4px);height:${SIG_IMG_H};object-fit:contain;display:block;margin:0 auto;" alt="서명">`
       : '';
     let stamp = '';
     if (a.status==='approved') {
       stamp = sigImg
-        ? `<div style="display:flex;flex-direction:column;align-items:center;gap:1px;padding:8px 0">${sigImg}</div>`
-        : `<div class="ap-cell done" style="font-size:44px;line-height:1.2">✓</div>`;
+        ? sigImg
+        : `<div style="font-size:30px;line-height:1;color:#000;font-weight:700;text-align:center">✓</div>`;
     } else if (a.status==='rejected') {
-      stamp = `<div class="ap-cell rejected" style="font-size:17px;line-height:1.2">반<br>려</div>`;
+      stamp = `<div style="font-size:13px;line-height:1.3;color:#000;font-weight:700;text-align:center">반<br>려</div>`;
     } else {
-      stamp = `<div style="color:#bbb;font-size:12px;padding:8px 0">대기</div>`;
+      stamp = `<div style="color:#000;font-size:10px;text-align:center;padding:${SIG_IMG_H} 0 0">대기</div>`;
     }
-    return `<td class="ap-cell" style="padding:4px 8px">${stamp}<span class="ap-date" style="margin-top:2px">${a.date||''}</span></td>`;
+    return `<td style="${BS}text-align:center;width:${COL_W};vertical-align:middle;padding:3px 2px;overflow:hidden">${stamp}<span style="font-size:9px;color:#000;display:block;line-height:1.4;text-align:center">${a.date||''}</span></td>`;
   }).join('');
 
   // 제출일 년월일 형식 변환
@@ -3384,42 +3485,111 @@ function printDoc(docId) {
     ? `${dateParts[0]}년 ${dateParts[1]}월 ${dateParts[2]}일`
     : doc.date;
 
-  // 결재표 HTML
-  const approvalTableHtml = `
-    <div class="pd-approval-wrap" style="margin-top:8px;margin-bottom:8px">
-      <table class="pd-approval-table">
-        <tr><th class="ap-row-label" rowspan="2" style="vertical-align:middle;font-size:15px;letter-spacing:2px;padding:4px 2px;width:0.1cm">결<br>재</th>${approverHeaders}</tr>
-        <tr>${approverCells}</tr>
-      </table>
-      <div class="pd-clearfix"></div>
-    </div>`;
-
-  // 내용 렌더링 후 form-title 아래에 결재표 삽입
+  // 내용 렌더링 후 form-title + 결재표를 하나의 table로 나란히 배치
   const tmp = document.createElement('div');
   tmp.innerHTML = renderDocContent(doc.content);
-  // form-sub(작성일) 제거
   tmp.querySelectorAll('.form-sub').forEach(el => el.remove());
   const formTitle = tmp.querySelector('.form-title');
   if (formTitle) {
-    formTitle.insertAdjacentHTML('afterend', approvalTableHtml);
+    const titleText = formTitle.textContent.trim();
+    // 결재란: 직위(1행) / 이름(2행) / 서명(3행) 으로 구성
+    // "결재" 레이블: 1cm 고정, <br>로 세로 텍스트
+    const combinedHtml = `<table style="width:100%;border-collapse:collapse;margin-bottom:12px;table-layout:fixed">
+      <colgroup>
+        <col style="width:auto">
+        <col style="width:1cm">
+        ${doc.approvers.map(() => `<col style="width:${COL_W}">`).join('')}
+      </colgroup>
+      <tr>
+        <td rowspan="3" style="${BS}text-align:center;font-size:40px;font-weight:700;letter-spacing:3px;padding:14px 20px;vertical-align:middle;color:#000">${titleText}</td>
+        <td rowspan="3" style="${BS}vertical-align:middle;text-align:center;font-size:15px;font-weight:700;padding:4px 2px;background:#cce8ff;color:#000;print-color-adjust:exact;-webkit-print-color-adjust:exact;line-height:1.8;letter-spacing:2px">결<br>재</td>
+        ${apPos}
+      </tr>
+      <tr>${apName}</tr>
+      <tr>${apCells}</tr>
+    </table>`;
+    formTitle.outerHTML = combinedHtml;
   }
   const renderedContent = tmp.innerHTML;
 
   const printHtml = `
     <div class="pd-body-no-date" style="font-size:13px;line-height:1.8">${renderedContent}</div>
-
-    <div style="margin-top:32px;text-align:center;font-size:20px;color:#333">${submitDateStr}</div>
-    <div style="margin-top:8px;text-align:center;font-size:25px;font-weight:700;letter-spacing:4px">${companyName}장 귀하</div>
-
   `;
 
   document.getElementById('printModalArea').innerHTML = printHtml;
+
+  // "위와 같이" 문구: 가운데 정렬·20px, 뒤에 날짜·회사명 삽입
+  document.querySelectorAll('#printModalArea p').forEach(p => {
+    if (!p.textContent.includes('위와 같이')) return;
+    p.style.fontSize  = '20px';
+    p.style.textAlign = 'center';
+
+    const after = document.createElement('div');
+    after.style.cssText = 'text-align:center;color:#000;line-height:1.8';
+    after.innerHTML = `
+      <br><br><br>
+      <span style="font-size:20px">${submitDateStr}</span>
+      <br><br><br>
+      <span style="font-size:25px;font-weight:700;letter-spacing:4px">${companyName}장 귀하</span>
+    `;
+    p.insertAdjacentElement('afterend', after);
+  });
+
+  // 변경 사유·비고 행 + 5번째 행 높이 150px 고정
+  const KEEP_KEYS = ['변경 사유', '비고'];
+  document.querySelectorAll('#printModalArea .form-table tr').forEach((tr, idx) => {
+    const thText = (tr.querySelector('th') || {}).textContent || '';
+    if (KEEP_KEYS.some(k => thText.includes(k)) || idx === 4) {
+      tr.querySelectorAll('td, th').forEach(cell => {
+        cell.style.height = '150px';
+      });
+    }
+  });
+
   document.getElementById('printDocTitle').textContent = '— ' + doc.title;
   document.getElementById('printPreviewModal').classList.add('open');
+
 }
 
 function closePrintPreview() {
   document.getElementById('printPreviewModal').classList.remove('open');
+}
+
+function closeThenPrint(docId) {
+  closeModal('docViewModal');
+  printDoc(docId);
+}
+
+// 결재함 처리 완료에서 수정 (관리자 전용)
+function forceEditDoc(docId) {
+  if (!(currentUser && currentUser.role === 'admin')) { showToast('관리자만 문서를 수정할 수 있습니다.', 'warning'); return; }
+  const doc = DB.docs.find(d=>d.id===docId);
+  if (!doc) return;
+  editingDocId = docId;
+  document.getElementById('docTitle').value = doc.title;
+  document.getElementById('docType').value = doc.type;
+  document.getElementById('docUrgency').value = doc.urgency||'normal';
+  document.getElementById('docRetention').value = doc.retention||'1년';
+  document.getElementById('docContent').innerHTML = doc.content||'';
+  selectedApprovers = doc.approvers.map(a=>a.id);
+  renderDocApprovalLine();
+  _setWriteDocHeader(true);
+  _setDocFormMode(null);
+  document.getElementById('docFormSelectorView').style.display = 'none';
+  document.getElementById('docFormEditorView').style.display = '';
+  closeModal('docViewModal');
+  showPage('writeDoc', null);
+}
+
+// 결재함 처리 완료에서 삭제 후 결재함 목록 갱신
+function deleteDocFromApproval(id) {
+  if (!confirm('정말 삭제하시겠습니까?')) return;
+  const i = DB.docs.findIndex(d=>d.id===id);
+  if (i>-1) DB.docs.splice(i,1);
+  sbRemove('docs', id);
+  closeModal('docViewModal');
+  loadApprovalBox();
+  showToast('문서가 삭제되었습니다.','success');
 }
 
 function executePrint() {
