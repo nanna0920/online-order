@@ -768,21 +768,21 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
     </div>
     <div class="sidebar-nav">
       <div class="nav-section">메인</div>
-      <div class="nav-item active" onclick="showPage('dashboard',this)">
+      <div class="nav-item active" id="navDashboard" onclick="showPage('dashboard',this)">
         <span class="ni">📅</span> 기관 월간 행사
       </div>
-      <div class="nav-item" onclick="showPage('notice',this)">
+      <div class="nav-item" id="navNotice" onclick="showPage('notice',this)">
         <span class="ni">📢</span> 공지사항
         <span class="nav-badge" id="noticeBadge" style="display:none">0</span>
       </div>
-      <div class="nav-item" onclick="showPage('teamCal',this)">
+      <div class="nav-item" id="navTeamCal" onclick="showPage('teamCal',this)">
         <span class="ni">📅</span> 팀별 월간 행사
       </div>
-      <div class="nav-section">결재</div>
-      <div class="nav-item" onclick="showPage('writeDoc',this)">
+      <div class="nav-section" id="navSectionApproval">결재</div>
+      <div class="nav-item" id="navWriteDoc" onclick="showPage('writeDoc',this)">
         <span class="ni">✍️</span> 문서 기안
       </div>
-      <div class="nav-item" onclick="showPage('myDocs',this)">
+      <div class="nav-item" id="navMyDocs" onclick="showPage('myDocs',this)">
         <span class="ni">📂</span> 내 문서함
         <span class="nav-badge" id="myDocsTotalBadge" style="display:none">0</span>
       </div>
@@ -1614,6 +1614,27 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('noticeModal')">취소</button>
       <button class="btn btn-primary" id="noticeSubmitBtn" onclick="saveNotice()">📢 등록</button>
+    </div>
+  </div>
+</div>
+
+<!-- 메뉴 권한 설정 모달 -->
+<div class="modal-overlay" id="menuPermModal">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <h3 id="menuPermModalTitle">🔐 메뉴 권한 설정</h3>
+      <button class="modal-close" onclick="closeModal('menuPermModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-sub);margin-bottom:16px">
+        체크된 메뉴만 해당 구성원에게 표시됩니다. 관리자 전용 메뉴는 역할에 따라 자동 적용됩니다.
+      </p>
+      <input type="hidden" id="menuPermUserId">
+      <div id="menuPermList" style="display:flex;flex-direction:column;gap:10px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('menuPermModal')">취소</button>
+      <button class="btn btn-primary" onclick="saveMenuPerm()">💾 저장</button>
     </div>
   </div>
 </div>
@@ -2680,7 +2701,7 @@ function applyDBChange(type, data) {
   } else if (type === 'users') {
     const idx = DB.users.findIndex(u => u.id === data.id);
     if (idx > -1) DB.users[idx] = data; else DB.users.push(data);
-    if (currentUser && currentUser.id === data.id) Object.assign(currentUser, data);
+    if (currentUser && currentUser.id === data.id) { Object.assign(currentUser, data); applyMenuPerms(currentUser); }
   } else if (type === 'notices') {
     const idx = DB.notices.findIndex(n => n.id === data.id);
     if (idx > -1) DB.notices[idx] = data; else DB.notices.push(data);
@@ -2850,8 +2871,8 @@ async function doLogin() {
   if (!_isAdmin) {
     document.getElementById('noticeWriteBtn').style.display = 'none';
   }
-  const canSeeApproval = _isAdmin || ['팀장', '과장', '시설장'].includes(user.pos);
-  document.getElementById('navApprovalBox').style.display = canSeeApproval ? '' : 'none';
+  // 메뉴 권한 적용 (user.menus 기반)
+  applyMenuPerms(user);
   loadSettings();
   _lastSyncTime = '';      // 이전 세션 타임스탬프 초기화
   _pollLastIds  = new Set(); // 이전 세션 폴 캐시 초기화
@@ -2920,6 +2941,11 @@ const pageTitles = {
 };
 
 function showPage(name, navEl) {
+  // 메뉴 권한 체크 (관리자 제외, 권한 설정된 메뉴 키만 차단)
+  if (currentUser && !isAdmin(currentUser) && MENU_PERMS.some(m=>m.key===name)) {
+    const allowed = Array.isArray(currentUser.menus) ? currentUser.menus : MENU_PERMS.map(m=>m.key);
+    if (!allowed.includes(name)) { showToast('해당 메뉴에 대한 접근 권한이 없습니다.','error'); return; }
+  }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const page = document.getElementById('page-'+name);
@@ -5470,6 +5496,7 @@ function renderMembers(q) {
           <button class="btn btn-sm btn-secondary" onclick="editMember('${u.id}')">✏️ 수정</button>
           <button class="btn btn-sm btn-outline" onclick="toggleUserActive('${u.id}')">${u.active?'비활성화':'활성화'}</button>
           <button class="btn btn-sm" style="background:#f0f4f8;color:var(--primary)" onclick="toggleUserRole('${u.id}')">${u.role==='admin'?'일반으로':'관리자로'}</button>
+          ${u.role !== 'admin' ? `<button class="btn btn-sm" style="background:#eef4ff;color:#1a5cb0;border:1px solid #b8d0f5" onclick="openMenuPermModal('${u.id}')">🔐 권한</button>` : ''}
           ${u.id !== currentUser.id ? `<button class="btn btn-sm btn-danger" onclick="deleteMember('${u.id}')">🗑️ 삭제</button>` : ''}
         `:''}
       </td>
@@ -5608,6 +5635,65 @@ function toggleUserRole(uid) {
   sbSave('users', uid, u);
   renderMembers('');
   showToast(`${u.name}님 권한이 변경되었습니다.`,'success');
+}
+
+// ============================================================
+// MENU PERMISSIONS
+// ============================================================
+const MENU_PERMS = [
+  {key:'dashboard',   label:'기관 월간 행사',  icon:'📅'},
+  {key:'notice',      label:'공지사항',         icon:'📢'},
+  {key:'teamCal',     label:'팀별 월간 행사',   icon:'📅'},
+  {key:'writeDoc',    label:'문서 기안',         icon:'✍️'},
+  {key:'myDocs',      label:'내 문서함',         icon:'📂'},
+  {key:'approvalBox', label:'결재함',            icon:'📥'},
+];
+
+function openMenuPermModal(uid) {
+  const u = getUser(uid);
+  if (!u) return;
+  document.getElementById('menuPermUserId').value = uid;
+  document.getElementById('menuPermModalTitle').textContent = `🔐 메뉴 권한 설정 — ${u.name} (${u.pos})`;
+  const allowed = Array.isArray(u.menus) ? u.menus : MENU_PERMS.map(m => m.key);
+  document.getElementById('menuPermList').innerHTML = MENU_PERMS.map(m => `
+    <label style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:.15s"
+           onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
+      <input type="checkbox" id="mperm_${m.key}" value="${m.key}" ${allowed.includes(m.key)?'checked':''} style="width:16px;height:16px;accent-color:var(--primary);cursor:pointer">
+      <span style="font-size:16px">${m.icon}</span>
+      <span style="font-size:14px;font-weight:500">${m.label}</span>
+    </label>`).join('');
+  openModal('menuPermModal');
+}
+
+function saveMenuPerm() {
+  const uid = document.getElementById('menuPermUserId').value;
+  const u = getUser(uid);
+  if (!u) return;
+  u.menus = MENU_PERMS.map(m => m.key).filter(k => document.getElementById('mperm_'+k)?.checked);
+  sbSave('users', uid, u);
+  closeModal('menuPermModal');
+  showToast(`${u.name}님 메뉴 권한이 저장되었습니다.`, 'success');
+}
+
+function applyMenuPerms(user) {
+  const _isAdmin = isAdmin(user);
+  const allowed = _isAdmin ? null : (Array.isArray(user.menus) ? user.menus : MENU_PERMS.map(m => m.key));
+  const navMap = {
+    dashboard:'navDashboard', notice:'navNotice', teamCal:'navTeamCal',
+    writeDoc:'navWriteDoc', myDocs:'navMyDocs', approvalBox:'navApprovalBox'
+  };
+  let anyApproval = false;
+  MENU_PERMS.forEach(m => {
+    const el = document.getElementById(navMap[m.key]);
+    if (!el) return;
+    const show = _isAdmin || !allowed || allowed.includes(m.key);
+    el.style.display = show ? '' : 'none';
+    if (['writeDoc','myDocs','approvalBox'].includes(m.key) && show) anyApproval = true;
+  });
+  // 결재 섹션 헤더: 결재 관련 메뉴가 하나라도 보이거나 관리자면 표시
+  const secEl = document.getElementById('navSectionApproval');
+  if (secEl) secEl.style.display = (_isAdmin || anyApproval) ? '' : 'none';
+  // 결재라인 설정은 관리자 전용이므로 별도 처리 안 함
 }
 
 // ============================================================
