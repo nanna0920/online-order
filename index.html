@@ -2792,10 +2792,10 @@ const DB = {
   memoAll:  [],   // 전체 공지 달력 메모: {id, date:'YYYY-MM-DD', content, author}
   memoTeam: [],   // 팀별 달력 메모: {id, date:'YYYY-MM-DD', content, team, author}
   settings: {     // 회사 정보
-    companyName: '주식회사 케어플러스',
-    ceo: '김대표',
-    addr: '서울특별시 강남구 테헤란로 123',
-    phone: '02-1234-5678'
+    companyName: '',
+    ceo: '',
+    addr: '',
+    phone: ''
   }
 };
 
@@ -4661,7 +4661,7 @@ function printDoc(docId) {
   const writer = getUser(doc.writer);
   const now = new Date().toLocaleString('ko-KR');
   const opinions = doc.approvers.filter(a=>a.opinion&&a.opinion.trim());
-  const companyName = (DB.settings && DB.settings.companyName) || '주식회사 케어플러스';
+  const companyName = (DB.settings && DB.settings.companyName) || '';
   const urgencyText = {normal:'일반', urgent:'긴급', 'very-urgent':'매우긴급'}[doc.urgency] || '일반';
   const statusText = {approved:'결재완료', rejected:'반려', pending:'진행중', draft:'임시저장'}[doc.status] || '-';
 
