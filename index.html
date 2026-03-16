@@ -5774,6 +5774,7 @@ function saveCompanyInfo() {
     phone: document.getElementById('settingPhone').value
   };
   sbSave('settings', 'company', DB.settings);
+  renderLoginCompanyInfo();
   showToast('회사 정보가 저장되었습니다.','success');
 }
 function loadCompanySettings() {
