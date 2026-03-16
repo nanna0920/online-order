@@ -5775,6 +5775,7 @@ function saveCompanyInfo() {
   };
   sbSave('settings', 'company', DB.settings);
   renderLoginCompanyInfo();
+  loadCompanySettings();
   showToast('회사 정보가 저장되었습니다.','success');
 }
 function loadCompanySettings() {
@@ -6180,8 +6181,13 @@ function showToast(msg, type='info') {
 // ============================================================
 // INIT
 // ============================================================
-window.addEventListener('load',()=>{
+window.addEventListener('load', async ()=>{
   renderLoginCompanyInfo();
+  // Supabase에서 회사 설정 미리 로드 (로그인 전에도 최신 회사 정보 표시)
+  try {
+    const {data} = await sb.from('e_approval').select('*').eq('type','settings');
+    if (data && data.length) { DB.settings = data[0].data; renderLoginCompanyInfo(); }
+  } catch(e) {}
   // Enter key login
   document.getElementById('loginPw').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
   // 알림 버튼 초기 상태 반영
