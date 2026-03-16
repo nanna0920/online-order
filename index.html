@@ -698,6 +698,7 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
         <span style="font-size:13px;color:var(--text-sub)">계정이 없으신가요? </span>
         <button class="link-text" onclick="showRegister()">회원가입</button>
       </div>
+      <div id="loginCompanyInfo" style="margin-top:32px;padding-top:20px;border-top:1px solid var(--border);text-align:center"></div>
     </div>
   </div>
 </div>
@@ -2005,7 +2006,7 @@ async function loadFromSupabase() {
       }); // 삭제 후 빈 배열도 반영 (기본값 덮어쓰기)
       if (byType.depts && byType.depts.length)     DB.depts     = byType.depts;
       if (byType.templates && byType.templates.length) DB.templates = byType.templates;
-      if (byType.settings && byType.settings.length) DB.settings = byType.settings[0];
+      if (byType.settings && byType.settings.length) { DB.settings = byType.settings[0]; renderLoginCompanyInfo(); }
       if (byType.memoAll)    DB.memoAll    = byType.memoAll;
       if (byType.memoTeam)   DB.memoTeam   = byType.memoTeam;
       DB.notifications = byType.notification || []; // 로그인 시점 알림 레코드 (기존 알림 재표시 방지용)
@@ -2590,7 +2591,7 @@ async function fullSyncSupabase() {
     });  // 결재라인은 소량이므로 항상 갱신
     if (byType.depts)      DB.depts     = toArr('depts');
     if (byType.templates)  DB.templates = toArr('templates');
-    if (byType.settings && byType.settings.length) DB.settings = byType.settings[0].data;
+    if (byType.settings && byType.settings.length) { DB.settings = byType.settings[0].data; renderLoginCompanyInfo(); }
     if (byType.memoAll)    DB.memoAll    = toArrMerge('memoAll');
     if (byType.memoTeam)   DB.memoTeam   = toArrMerge('memoTeam');
 
@@ -2694,6 +2695,7 @@ function applyDBChange(type, data) {
     if (idx > -1) DB.templates[idx] = data; else DB.templates.push(data);
   } else if (type === 'settings') {
     DB.settings = data;
+    renderLoginCompanyInfo();
   } else if (type === 'memoAll') {
     const idx = DB.memoAll.findIndex(m => m.id === data.id);
     if (idx > -1) DB.memoAll[idx] = data; else DB.memoAll.push(data);
@@ -2777,6 +2779,23 @@ const DB = {
 };
 
 let currentUser = null;
+
+function renderLoginCompanyInfo() {
+  const el = document.getElementById('loginCompanyInfo');
+  if (!el) return;
+  const s = DB.settings || {};
+  const name  = s.companyName || '';
+  const ceo   = s.ceo   || '';
+  const addr  = s.addr  || '';
+  const phone = s.phone || '';
+  if (!name && !addr && !phone) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <div style="font-size:14px;font-weight:700;color:var(--primary);margin-bottom:6px">${name}</div>
+    ${ceo   ? `<div style="font-size:12px;color:var(--text-sub);margin-bottom:3px">대표 ${ceo}</div>` : ''}
+    ${addr  ? `<div style="font-size:12px;color:var(--text-muted);margin-bottom:3px">📍 ${addr}</div>` : ''}
+    ${phone ? `<div style="font-size:12px;color:var(--text-muted)">📞 ${phone}</div>` : ''}
+  `;
+}
 
 // 관리자 권한 판별: role==='admin' 또는 직위==='부원장'
 function isAdmin(u) { return !!(u && (u.role === 'admin' || u.pos === '부원장')); }
@@ -6161,6 +6180,7 @@ function showToast(msg, type='info') {
 // INIT
 // ============================================================
 window.addEventListener('load',()=>{
+  renderLoginCompanyInfo();
   // Enter key login
   document.getElementById('loginPw').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
   // 알림 버튼 초기 상태 반영
