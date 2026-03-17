@@ -2025,10 +2025,8 @@ async function loadFromSupabase() {
       if (byType.users && byType.users.length)     DB.users     = byType.users;
       if (byType.notices && byType.notices.length) DB.notices   = byType.notices;
       DB.lines     = (byType.lines || []).map(l => {
-        // 구 형식(docTypes 없음): docType 문자열 → 배열 변환, 'all'은 빈 배열
-        if (!l.docTypes) { l = {...l, docTypes: (l.docType && l.docType !== 'all') ? [l.docType] : []}; }
-        // 신 형식이라도 ['all'] 단독인 경우(이전 버그로 생성된 레거시): 빈 배열로 초기화
-        else if (l.docTypes.length === 1 && l.docTypes[0] === 'all') { l = {...l, docTypes: []}; }
+        // 구 형식(docTypes 없음): docType 문자열 → 배열 변환
+        if (!l.docTypes) { l = {...l, docTypes: l.docType ? [l.docType] : []}; }
         return l;
       }); // 삭제 후 빈 배열도 반영 (기본값 덮어쓰기)
       if (byType.depts && byType.depts.length)     DB.depts     = byType.depts;
@@ -2612,8 +2610,8 @@ async function fullSyncSupabase() {
     if (byType.users)      DB.users   = toArr('users');
     DB.notices = toArr('notices');   // 전체 조회 기준 → 삭제 시 빈 배열로 교체
     DB.lines = toArr('lines').map(l => {
-      if (!l.docTypes) { l = {...l, docTypes: (l.docType && l.docType !== 'all') ? [l.docType] : []}; }
-      else if (l.docTypes.length === 1 && l.docTypes[0] === 'all') { l = {...l, docTypes: []}; }
+      // 구 형식(docTypes 없음): docType 문자열 → 배열 변환
+      if (!l.docTypes) { l = {...l, docTypes: l.docType ? [l.docType] : []}; }
       return l;
     });  // 결재라인은 소량이므로 항상 갱신
     if (byType.depts)      DB.depts     = toArr('depts');
