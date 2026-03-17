@@ -2924,7 +2924,9 @@ function doRegister() {
   if (!name||!id||!pw||!dept||!pos||!job) { showToast('필수 항목을 입력하세요.','error'); return; }
   if (pw !== pw2) { showToast('비밀번호가 일치하지 않습니다.','error'); return; }
   if (DB.users.find(u=>u.id===id)) { showToast('이미 사용 중인 아이디입니다.','error'); return; }
-  const newUser = {id,pw,name,dept,pos,job,email:document.getElementById('regEmail').value,tel:document.getElementById('regTel').value,role:'user',sig:'',active:true};
+  const _defPerms = {};
+  MENU_PERMS.forEach(m => { _defPerms[m.key] = DEFAULT_ACTIVE_MENUS.includes(m.key) ? {r:true,w:true} : {r:false,w:false}; });
+  const newUser = {id,pw,name,dept,pos,job,email:document.getElementById('regEmail').value,tel:document.getElementById('regTel').value,role:'user',sig:'',active:true,menuPerms:_defPerms,menus:[...DEFAULT_ACTIVE_MENUS]};
   DB.users.push(newUser);
   sbSave('users', id, newUser);
   showToast('회원가입이 완료되었습니다! 로그인해주세요.','success');
@@ -5713,9 +5715,13 @@ const MENU_PERMS = [
 
 // user.menuPerms = { [key]: {r:bool, w:bool} } 구조로 읽기/쓰기 권한 관리
 // 구버전 user.menus(배열) 하위 호환 지원
+// 기본 활성 메뉴: 기관 월간 행사, 공지사항, 팀별 월간 행사, 문서 기안, 내 문서함
+// 기본 비활성 메뉴: 결재함
+const DEFAULT_ACTIVE_MENUS = ['dashboard', 'notice', 'teamCal', 'writeDoc', 'myDocs'];
+
 function getMenuPermsObj(user) {
   if (user.menuPerms && typeof user.menuPerms === 'object' && !Array.isArray(user.menuPerms)) return user.menuPerms;
-  const menus = Array.isArray(user.menus) ? user.menus : MENU_PERMS.map(m => m.key);
+  const menus = Array.isArray(user.menus) ? user.menus : DEFAULT_ACTIVE_MENUS;
   const obj = {};
   MENU_PERMS.forEach(m => { obj[m.key] = menus.includes(m.key) ? {r:true, w:true} : {r:false, w:false}; });
   return obj;
