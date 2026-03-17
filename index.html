@@ -1145,7 +1145,7 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
         <div class="card-body" style="padding:0">
           <div class="table-wrap">
             <table>
-              <thead><tr><th>이름</th><th>아이디</th><th>부서</th><th>직위</th><th>이메일</th><th>상태</th><th>권한</th><th style="min-width:260px">메뉴 권한 (활성/비활성)</th><th>관리</th></tr></thead>
+              <thead><tr><th style="width:40px">순번</th><th>이름</th><th>아이디</th><th>부서</th><th>직위</th><th>이메일</th><th>상태</th><th>권한</th><th style="min-width:260px">메뉴 권한 (활성/비활성)</th><th>관리</th></tr></thead>
               <tbody id="membersTbody"></tbody>
             </table>
           </div>
@@ -5515,7 +5515,7 @@ function renderMembers(q) {
   if (q) users = users.filter(u=>u.name.includes(q)||u.dept.includes(q)||u.id.includes(q));
   const tbody = document.getElementById('membersTbody');
   const _curIsAdmin = !!(currentUser && (currentUser.role === 'admin' || currentUser.pos === '부원장'));
-  tbody.innerHTML = users.map(u => {
+  tbody.innerHTML = users.map((u, i) => {
     const uIsAdmin = u.role === 'admin' || u.pos === '부원장';
     // 메뉴 권한 요약 셀 생성
     let menuPermCell;
@@ -5541,6 +5541,7 @@ function renderMembers(q) {
     }
     return `
     <tr>
+      <td style="text-align:center;color:var(--text-sub);font-size:13px">${i+1}</td>
       <td><div style="display:flex;align-items:center;gap:8px"><div style="width:30px;height:30px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">${u.name[0]}</div>${u.name}</div></td>
       <td style="color:var(--text-sub)">${u.id}</td>
       <td>${u.dept}</td>
