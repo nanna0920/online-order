@@ -6614,11 +6614,16 @@ function loadTemplates() {
     </td></tr>`;
     return;
   }
-  const sortedTpls = [...DB.templates].sort((a, b) => {
-    const ta = a.updatedAt || '';
-    const tb = b.updatedAt || '';
-    return tb.localeCompare(ta); // 최신 수정일 우선
-  });
+  const _parseUpdatedAt = s => {
+    if (!s) return 0;
+    const [datePart, timePart = '00:00'] = s.split(' ');
+    const [y, m, d] = datePart.split('-').map(Number);
+    const [h, mn] = timePart.split(':').map(Number);
+    return new Date(y, m - 1, d, h, mn).getTime();
+  };
+  const sortedTpls = [...DB.templates].sort((a, b) =>
+    _parseUpdatedAt(b.updatedAt) - _parseUpdatedAt(a.updatedAt)
+  );
   tbody.innerHTML = sortedTpls.map((t, i) => `
     <tr>
       <td style="color:var(--text-muted);text-align:center;font-size:12px">${i+1}</td>
