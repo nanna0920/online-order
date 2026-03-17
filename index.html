@@ -890,7 +890,7 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
           <div style="margin-left:auto;display:flex;gap:8px" class="no-print">
             <button class="btn btn-secondary" onclick="openDocFormSelect()">📋 양식 변경</button>
             <button class="btn btn-outline" onclick="openApprovalModal()">+ 결재자 추가</button>
-            <button class="btn btn-primary" onclick="submitDoc()">📤 기안 제출</button>
+            <button id="docSubmitBtn" class="btn btn-primary" onclick="submitDoc()">📤 기안 제출</button>
           </div>
         </div>
         <div class="doc-form">
@@ -2875,10 +2875,7 @@ async function doLogin() {
   document.querySelectorAll('.admin-only').forEach(el => {
     el.style.display = _isAdmin ? '' : 'none';
   });
-  if (!_isAdmin) {
-    document.getElementById('noticeWriteBtn').style.display = 'none';
-  }
-  // 메뉴 권한 적용 (user.menus 기반)
+  // 메뉴 권한 적용 (user.menus 기반) - noticeWriteBtn 표시 여부는 applyMenuPerms/loadNotice가 처리
   applyMenuPerms(user);
   loadSettings();
   _lastSyncTime = '';      // 이전 세션 타임스탬프 초기화
@@ -3475,7 +3472,8 @@ function calSaveEditor() {
 }
 
 function calSaveSpecial(type, monthPfx, ta) {
-  if (!(!!(currentUser && (currentUser.role === 'admin' || currentUser.pos === '부원장')))) return;
+  const permKey = type === 'all' ? 'dashboard' : 'teamCal';
+  if (!hasMenuPerm(currentUser, permKey, 'w')) return;
   const content = ta.value.trim();
   const ds = `${monthPfx}-00`;
   const arr = type === 'all' ? DB.memoAll : DB.memoTeam;
@@ -3969,7 +3967,7 @@ function selectDocForm(formName) {
   document.getElementById('docFormSelectorView').style.display = 'none';
   document.getElementById('docFormEditorView').style.display = '';
   // 기안 제출 버튼: writeDoc 쓰기 권한 없으면 숨김
-  const _submitBtn = document.querySelector('#docFormEditorView .btn-primary[onclick="submitDoc()"]');
+  const _submitBtn = document.getElementById('docSubmitBtn');
   if (_submitBtn) _submitBtn.style.display = hasMenuPerm(currentUser, 'writeDoc', 'w') ? '' : 'none';
   // 서식 모드로 전환
   // 서식 내용 삽입
@@ -4311,6 +4309,7 @@ function editDoc(docId) {
 }
 
 async function deleteDoc(id) {
+  if (!hasMenuPerm(currentUser, 'myDocs', 'w')) { showToast('삭제 권한이 없습니다.', 'error'); return; }
   if (!confirm('정말 삭제하시겠습니까?')) return;
   const i = DB.docs.findIndex(d=>d.id===id);
   if (i>-1) DB.docs.splice(i,1);
@@ -5820,6 +5819,11 @@ function saveMenuPerm() {
   u.menuPerms = permsObj;
   u.menus = MENU_PERMS.map(m => m.key).filter(k => permsObj[k]?.r || permsObj[k]?.w);
   sbSave('users', uid, u);
+  // 현재 로그인 사용자 본인 권한이 변경된 경우 즉시 반영
+  if (currentUser && currentUser.id === uid) {
+    Object.assign(currentUser, u);
+    applyMenuPerms(currentUser);
+  }
   closeModal('menuPermModal');
   renderMembers(_memberSearchQ);
   showToast(`${u.name}님 메뉴 권한이 저장되었습니다.`, 'success');
@@ -5848,9 +5852,20 @@ function applyMenuPerms(user) {
   const activePage = document.querySelector('.page.active');
   if (!activePage) return;
   const pageId = activePage.id?.replace('page-', '');
-  if (pageId === 'notice')      { loadNotice(); }
+  // 현재 페이지 접근 권한이 없으면 대시보드로 이동
+  const pagePermMap = { notice:'notice', dashboard:'dashboard', teamCal:'teamCal',
+                        writeDoc:'writeDoc', myDocs:'myDocs', approvalBox:'approvalBox' };
+  const pagePermKey = pagePermMap[pageId];
+  if (!_isAdmin && pagePermKey && !perms?.[pagePermKey]?.r && !perms?.[pagePermKey]?.w) {
+    showPage('dashboard'); return;
+  }
+  if (pageId === 'notice')         { loadNotice(); }
   else if (pageId === 'dashboard') { try { renderCal('all'); } catch(e){} }
   else if (pageId === 'teamCal')   { try { renderCal('team'); } catch(e){} }
+  else if (pageId === 'writeDoc')  {
+    const submitBtn = document.getElementById('docSubmitBtn');
+    if (submitBtn) submitBtn.style.display = hasMenuPerm(user, 'writeDoc', 'w') ? '' : 'none';
+  }
   else if (pageId === 'myDocs')    { try { renderMyDocs(currentDocFilter||'all'); } catch(e){} }
   else if (pageId === 'approvalBox'){ try { renderApprovalBox(approvalFilter||'pending'); } catch(e){} }
 }
