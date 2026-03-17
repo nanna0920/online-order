@@ -1145,7 +1145,7 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
         <div class="card-body" style="padding:0">
           <div class="table-wrap">
             <table>
-              <thead><tr><th>이름</th><th>아이디</th><th>부서</th><th>직위</th><th>이메일</th><th>상태</th><th>권한</th><th style="min-width:200px">메뉴 권한</th><th>관리</th></tr></thead>
+              <thead><tr><th>이름</th><th>아이디</th><th>부서</th><th>직위</th><th>이메일</th><th>상태</th><th>권한</th><th style="min-width:260px">메뉴 권한 (활성/비활성)</th><th>관리</th></tr></thead>
               <tbody id="membersTbody"></tbody>
             </table>
           </div>
@@ -5485,8 +5485,25 @@ function saveDept() {
 // ============================================================
 // MEMBERS
 // ============================================================
-function loadMembers() { renderMembers(''); }
-function searchMembers(q) { renderMembers(q); }
+let _memberSearchQ = '';
+function loadMembers() { _memberSearchQ = ''; renderMembers(''); }
+function searchMembers(q) { _memberSearchQ = q; renderMembers(q); }
+
+// 메뉴 단일 활성/비활성 즉시 토글 (읽기+쓰기 동시 전환)
+function toggleMenuActive(uid, key) {
+  const u = getUser(uid);
+  if (!u) return;
+  const perms = getMenuPermsObj(u);
+  const isActive = !!(perms[key]?.r || perms[key]?.w);
+  perms[key] = isActive ? {r:false, w:false} : {r:true, w:true};
+  u.menuPerms = perms;
+  u.menus = MENU_PERMS.map(m => m.key).filter(k => perms[k]?.r || perms[k]?.w);
+  sbSave('users', uid, u);
+  renderMembers(_memberSearchQ);
+  const label = MENU_PERMS.find(m => m.key === key)?.label || key;
+  showToast(`${u.name}님의 [${label}] 메뉴가 ${isActive ? '비활성화' : '활성화'}되었습니다.`, isActive ? 'warning' : 'success');
+}
+
 function renderMembers(q) {
   let users = DB.users;
   if (q) users = users.filter(u=>u.name.includes(q)||u.dept.includes(q)||u.id.includes(q));
@@ -5503,18 +5520,26 @@ function renderMembers(q) {
       const rows = MENU_PERMS.map(m => {
         const r = perms[m.key]?.r;
         const w = perms[m.key]?.w;
+        const isActive = !!(r || w);
         const rBadge = r
           ? `<span style="font-size:10px;background:#e8f4ea;color:#1e7e44;padding:1px 6px;border-radius:8px;font-weight:600">읽기</span>`
           : `<span style="font-size:10px;background:#f0f0f0;color:#aaa;padding:1px 6px;border-radius:8px">읽기</span>`;
         const wBadge = w
           ? `<span style="font-size:10px;background:#eef4ff;color:#1a5cb0;padding:1px 6px;border-radius:8px;font-weight:600">쓰기</span>`
           : `<span style="font-size:10px;background:#f0f0f0;color:#aaa;padding:1px 6px;border-radius:8px">쓰기</span>`;
+        const toggleBtn = _curIsAdmin
+          ? `<button onclick="toggleMenuActive('${u.id}','${m.key}')"
+               style="font-size:10px;padding:2px 9px;border-radius:10px;border:1px solid ${isActive?'#1e7e44':'#ccc'};
+                      cursor:pointer;font-weight:700;background:${isActive?'#d4edda':'#f5f5f5'};
+                      color:${isActive?'#1e7e44':'#999'};white-space:nowrap;transition:.15s"
+             >${isActive ? '● 활성' : '○ 비활성'}</button>`
+          : '';
         return `<div style="display:flex;align-items:center;gap:4px;padding:2px 0">
-          <span style="font-size:11px;min-width:80px;color:var(--text-main)">${m.icon} ${m.label}</span>
-          ${rBadge}${wBadge}
+          <span style="font-size:11px;min-width:80px;color:${isActive?'var(--text-main)':'#bbb'}">${m.icon} ${m.label}</span>
+          ${rBadge}${wBadge}${toggleBtn}
         </div>`;
       }).join('');
-      menuPermCell = `<div style="display:flex;flex-direction:column;gap:1px">${rows}</div>`;
+      menuPermCell = `<div style="display:flex;flex-direction:column;gap:2px">${rows}</div>`;
     }
     return `
     <tr>
