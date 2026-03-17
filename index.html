@@ -6614,7 +6614,12 @@ function loadTemplates() {
     </td></tr>`;
     return;
   }
-  tbody.innerHTML = DB.templates.map((t, i) => `
+  const sortedTpls = [...DB.templates].sort((a, b) => {
+    const ta = a.updatedAt || '';
+    const tb = b.updatedAt || '';
+    return tb.localeCompare(ta); // 최신 수정일 우선
+  });
+  tbody.innerHTML = sortedTpls.map((t, i) => `
     <tr>
       <td style="color:var(--text-muted);text-align:center;font-size:12px">${i+1}</td>
       <td>
