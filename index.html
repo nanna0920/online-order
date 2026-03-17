@@ -1935,40 +1935,6 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
       </div>
       <div class="form-group"><label>이메일</label><input type="email" id="memberEditEmail" placeholder="example@company.com"></div>
       <div class="form-group"><label>연락처</label><input type="tel" id="memberEditTel" placeholder="010-0000-0000"></div>
-      <!-- 서명 -->
-      <div class="form-group">
-        <label style="display:flex;align-items:center;justify-content:space-between">
-          <span>서명</span>
-          <span style="display:flex;gap:6px">
-            <button type="button" class="btn btn-sm btn-secondary" onclick="previewMemberSign()" style="font-size:11px;padding:2px 8px">🔍 미리보기</button>
-            <button type="button" class="btn btn-sm btn-secondary" onclick="clearMemberSign()" style="font-size:11px;padding:2px 8px">지우기</button>
-            <label class="btn btn-sm btn-secondary" style="font-size:11px;padding:2px 8px;cursor:pointer;margin:0">
-              이미지 불러오기<input type="file" id="memberSignFile" accept="image/*" style="display:none" onchange="loadMemberSignImg(this)">
-            </label>
-          </span>
-        </label>
-        <!-- 현재 등록된 서명 표시 영역 (미리보기 클릭 시 노출) -->
-        <div id="memberCurrentSignWrap" style="display:none;border:1.5px solid #b8d4f8;border-radius:var(--radius-sm);
-             background:#f0f7ff;padding:8px 12px;margin-bottom:6px">
-          <div style="font-size:11px;color:#1a5cb0;font-weight:600;margin-bottom:6px">📋 현재 등록된 서명</div>
-          <div style="display:flex;align-items:center;justify-content:center;min-height:60px;background:#fff;
-               border-radius:4px;padding:4px">
-            <img id="memberCurrentSignImg" src="" alt="현재 서명"
-                 style="max-width:100%;max-height:90px;object-fit:contain;display:block">
-          </div>
-          <div id="memberCurrentSignNone" style="display:none;font-size:12px;color:#aaa;text-align:center;padding:12px">
-            등록된 서명이 없습니다.
-          </div>
-        </div>
-        <!-- 새 서명 입력 캔버스 -->
-        <div style="border:1.5px solid var(--border);border-radius:var(--radius-sm);background:#fff;position:relative;overflow:hidden">
-          <canvas id="memberSignCanvas" width="420" height="100"
-                  style="display:block;width:100%;height:100px;touch-action:none;cursor:crosshair"></canvas>
-          <span id="memberSignPlaceholder" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-                font-size:12px;color:#ccc;pointer-events:none;white-space:nowrap">마우스/터치로 서명하거나 이미지를 불러오세요</span>
-        </div>
-        <div style="font-size:11px;color:var(--text-sub);margin-top:4px">새로 입력하면 기존 서명이 교체됩니다. 입력 없이 저장하면 기존 서명 유지.</div>
-      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('memberEditModal')">취소</button>
@@ -5672,150 +5638,9 @@ function editMember(uid) {
   document.getElementById('memberEditPos').value = u.pos||'';
   // 담당직종
   document.getElementById('memberEditJob').value = u.job||'';
-  // 미리보기 영역은 닫힌 상태로 초기화 (미리보기 버튼 클릭 시 열림)
-  document.getElementById('memberCurrentSignWrap').style.display = 'none';
-  // 새 서명 캔버스는 항상 빈 상태로 시작
-  _initMemberSignCanvas();
   openModal('memberEditModal');
 }
 
-// 미리보기 버튼: Supabase에서 직접 최신 데이터 조회 후 서명 표시
-async function previewMemberSign() {
-  const uid  = document.getElementById('memberEditId').value;
-  const wrap = document.getElementById('memberCurrentSignWrap');
-  const img  = document.getElementById('memberCurrentSignImg');
-  const none = document.getElementById('memberCurrentSignNone');
-  wrap.style.display = '';
-  img.style.display  = 'none';
-  none.style.display = 'none';
-  none.textContent   = '불러오는 중...';
-  none.style.display = '';
-
-  try {
-    const rid = 'user-' + uid;
-    const { data, error } = await sb.from('e_approval').select('data').eq('id', rid).single();
-    if (error) throw error;
-    const sig = data?.data?.signature;
-    if (sig) {
-      // 인-메모리도 동기화
-      const u = getUser(uid);
-      if (u) u.signature = sig;
-      img.src            = sig;
-      img.style.display  = 'block';
-      none.style.display = 'none';
-    } else {
-      none.textContent   = '등록된 서명이 없습니다.';
-      none.style.display = '';
-    }
-  } catch(e) {
-    // Supabase 조회 실패 시 인-메모리 폴백
-    const u = getUser(uid);
-    if (u?.signature) {
-      img.src            = u.signature;
-      img.style.display  = 'block';
-      none.style.display = 'none';
-    } else {
-      none.textContent   = '등록된 서명이 없습니다.';
-      none.style.display = '';
-    }
-  }
-}
-
-// ── 서명 캔버스 (이벤트 핸들러를 전역 변수로 관리, cloneNode 없이 removeEventListener로 교체) ──
-let _signDrawing = false;
-let _signHasDrawn = false; // 이번 세션에 실제로 그렸는지 여부
-let _signHandlers = null;  // 현재 등록된 핸들러 참조
-
-function _initMemberSignCanvas() {
-  const c  = document.getElementById('memberSignCanvas');
-  const ph = document.getElementById('memberSignPlaceholder');
-  const cx = c.getContext('2d');
-
-  // 기존 핸들러 제거
-  if (_signHandlers) {
-    c.removeEventListener('mousedown',  _signHandlers.start);
-    c.removeEventListener('mousemove',  _signHandlers.move);
-    c.removeEventListener('mouseup',    _signHandlers.end);
-    c.removeEventListener('mouseleave', _signHandlers.end);
-    c.removeEventListener('touchstart', _signHandlers.start);
-    c.removeEventListener('touchmove',  _signHandlers.move);
-    c.removeEventListener('touchend',   _signHandlers.end);
-    _signHandlers = null;
-  }
-
-  // 캔버스 초기화 (빈 상태로)
-  _signDrawing = false;
-  _signHasDrawn = false;
-  cx.clearRect(0, 0, c.width, c.height);
-  cx.strokeStyle = '#1a1a2e';
-  cx.lineWidth = 2.2;
-  cx.lineCap = 'round';
-  cx.lineJoin = 'round';
-  if (ph) ph.style.display = '';
-
-  function getXY(e) {
-    const r = c.getBoundingClientRect();
-    const t = e.touches ? e.touches[0] : e;
-    return [(t.clientX - r.left) * (c.width / r.width),
-            (t.clientY - r.top)  * (c.height / r.height)];
-  }
-  function start(e) {
-    e.preventDefault();
-    _signDrawing = true;
-    _signHasDrawn = true;
-    const [x, y] = getXY(e);
-    cx.beginPath();
-    cx.moveTo(x, y);
-    if (ph) ph.style.display = 'none';
-  }
-  function move(e) {
-    if (!_signDrawing) return;
-    e.preventDefault();
-    const [x, y] = getXY(e);
-    cx.lineTo(x, y);
-    cx.stroke();
-  }
-  function end() { _signDrawing = false; }
-
-  _signHandlers = { start, move, end };
-  c.addEventListener('mousedown',  start);
-  c.addEventListener('mousemove',  move);
-  c.addEventListener('mouseup',    end);
-  c.addEventListener('mouseleave', end);
-  c.addEventListener('touchstart', start, { passive: false });
-  c.addEventListener('touchmove',  move,  { passive: false });
-  c.addEventListener('touchend',   end);
-}
-
-function clearMemberSign() {
-  const c  = document.getElementById('memberSignCanvas');
-  const ph = document.getElementById('memberSignPlaceholder');
-  c.getContext('2d').clearRect(0, 0, c.width, c.height);
-  _signHasDrawn = false;
-  if (ph) ph.style.display = '';
-}
-
-function loadMemberSignImg(input) {
-  if (!input.files || !input.files[0]) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    const img = new Image();
-    img.onload = () => {
-      const c  = document.getElementById('memberSignCanvas');
-      const cx = c.getContext('2d');
-      cx.clearRect(0, 0, c.width, c.height);
-      const scale = Math.min(c.width / img.width, c.height / img.height);
-      const w = img.width * scale, h = img.height * scale;
-      cx.drawImage(img, (c.width - w) / 2, (c.height - h) / 2, w, h);
-      _signHasDrawn = true;
-      const ph = document.getElementById('memberSignPlaceholder');
-      if (ph) ph.style.display = 'none';
-    };
-    img.src = ev.target.result;
-  };
-  reader.readAsDataURL(input.files[0]);
-  input.value = '';
-}
 
 function saveMemberEdit() {
   const uid = document.getElementById('memberEditId').value;
@@ -5837,11 +5662,6 @@ function saveMemberEdit() {
   u.tel   = document.getElementById('memberEditTel').value.trim();
   const newPw = document.getElementById('memberEditPw').value;
   if (newPw) u.pw = newPw;
-  // 새 서명이 그려진 경우에만 교체, 없으면 기존 서명 유지
-  if (_signHasDrawn) {
-    const signCanvas = document.getElementById('memberSignCanvas');
-    if (signCanvas) u.signature = signCanvas.toDataURL('image/jpeg', 0.7);
-  }
   sbSave('users', uid, u);
   closeModal('memberEditModal');
   renderMembers('');
