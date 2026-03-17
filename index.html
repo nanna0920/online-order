@@ -2641,7 +2641,7 @@ async function fullSyncSupabase() {
       return merged;
     };
     DB.docs    = toArr('docs');      // 전체 조회 기준 → 삭제 시 빈 배열로 교체
-    if (byType.users)      DB.users   = toArr('users');
+    if (byType.users)      DB.users   = toArrMerge('users'); // 로컬 pending 변경 보호
     DB.notices = toArr('notices');   // 전체 조회 기준 → 삭제 시 빈 배열로 교체
     DB.lines = toArr('lines').map(l => {
       // 구 형식(docTypes 없음): docType 문자열 → 배열 변환
@@ -5679,22 +5679,45 @@ function editMember(uid) {
   openModal('memberEditModal');
 }
 
-// 미리보기 버튼: DB에서 현재 uid의 서명을 직접 읽어 표시
-function previewMemberSign() {
+// 미리보기 버튼: Supabase에서 직접 최신 데이터 조회 후 서명 표시
+async function previewMemberSign() {
   const uid  = document.getElementById('memberEditId').value;
-  const u    = getUser(uid);
   const wrap = document.getElementById('memberCurrentSignWrap');
   const img  = document.getElementById('memberCurrentSignImg');
   const none = document.getElementById('memberCurrentSignNone');
   wrap.style.display = '';
-  if (u && u.signature) {
-    img.src            = u.signature;
-    img.style.display  = 'block';
-    none.style.display = 'none';
-  } else {
-    img.src            = '';
-    img.style.display  = 'none';
-    none.style.display = '';
+  img.style.display  = 'none';
+  none.style.display = 'none';
+  none.textContent   = '불러오는 중...';
+  none.style.display = '';
+
+  try {
+    const rid = 'user-' + uid;
+    const { data, error } = await sb.from('e_approval').select('data').eq('id', rid).single();
+    if (error) throw error;
+    const sig = data?.data?.signature;
+    if (sig) {
+      // 인-메모리도 동기화
+      const u = getUser(uid);
+      if (u) u.signature = sig;
+      img.src            = sig;
+      img.style.display  = 'block';
+      none.style.display = 'none';
+    } else {
+      none.textContent   = '등록된 서명이 없습니다.';
+      none.style.display = '';
+    }
+  } catch(e) {
+    // Supabase 조회 실패 시 인-메모리 폴백
+    const u = getUser(uid);
+    if (u?.signature) {
+      img.src            = u.signature;
+      img.style.display  = 'block';
+      none.style.display = 'none';
+    } else {
+      none.textContent   = '등록된 서명이 없습니다.';
+      none.style.display = '';
+    }
   }
 }
 
