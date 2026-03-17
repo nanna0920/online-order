@@ -5439,7 +5439,7 @@ function saveNotice() {
 function loadOrgChart() {
   const el = document.getElementById('orgTree');
   el.innerHTML = DB.depts.map(dept=>{
-    const members = DB.users.filter(u=>u.dept===dept.name&&u.active);
+    const members = DB.users.filter(u=>u.dept===dept.name&&u.active).sort((a,b)=>a.name.localeCompare(b.name,'ko'));
     const head = dept.head ? getUser(dept.head) : null;
     const isAdmin = !!(currentUser && (currentUser.role === 'admin' || currentUser.pos === '부원장'));
     return `
@@ -5511,7 +5511,7 @@ function toggleMenuActive(uid, key) {
 }
 
 function renderMembers(q) {
-  let users = DB.users;
+  let users = [...DB.users].sort((a,b)=>a.name.localeCompare(b.name,'ko'));
   if (q) users = users.filter(u=>u.name.includes(q)||u.dept.includes(q)||u.id.includes(q));
   const tbody = document.getElementById('membersTbody');
   const _curIsAdmin = !!(currentUser && (currentUser.role === 'admin' || currentUser.pos === '부원장'));
