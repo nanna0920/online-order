@@ -1160,9 +1160,23 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
         <div class="card">
           <div class="card-header"><h3>👤 내 정보 수정</h3></div>
           <div class="card-body">
-            <div class="form-group"><label>이름</label><input type="text" id="settingName"></div>
-            <div class="form-group"><label>이메일</label><input type="email" id="settingEmail"></div>
-            <div class="form-group"><label>연락처</label><input type="tel" id="settingTel"></div>
+            <div class="form-group" style="display:flex;align-items:flex-start;gap:16px">
+              <div style="flex:0 0 auto;text-align:center">
+                <div id="settingPhotoPreview" style="width:90px;height:110px;border:2px dashed #ccc;border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#f9f9f9;margin-bottom:6px">
+                  <span style="font-size:32px;color:#bbb">👤</span>
+                </div>
+                <label class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:12px">
+                  📷 사진 선택
+                  <input type="file" id="settingPhotoFile" accept=".jpg,.jpeg,.png" style="display:none" onchange="onSettingPhotoChange(this)">
+                </label>
+                <div style="font-size:11px;color:var(--text-sub);margin-top:4px">JPG / PNG</div>
+              </div>
+              <div style="flex:1">
+                <div class="form-group"><label>이름</label><input type="text" id="settingName"></div>
+                <div class="form-group"><label>이메일</label><input type="email" id="settingEmail"></div>
+                <div class="form-group"><label>연락처</label><input type="tel" id="settingTel"></div>
+              </div>
+            </div>
             <button class="btn btn-primary" onclick="saveSettings()">💾 저장</button>
           </div>
         </div>
@@ -2864,6 +2878,8 @@ async function doLogin() {
   document.getElementById('appPage').style.display = 'flex';
   document.getElementById('sideUserName').textContent = user.name;
   document.getElementById('sideUserRole').textContent = `${user.dept} · ${user.pos}`;
+  const _sideAv = document.getElementById('sideAvatar');
+  if (_sideAv && user.photo) _sideAv.innerHTML = `<img src="${user.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
   document.getElementById('docWriter').textContent = `${user.name} (${user.pos})`;
   document.getElementById('docDept').textContent = user.dept;
   document.getElementById('docDate').textContent = new Date().toLocaleDateString('ko-KR');
@@ -5989,11 +6005,34 @@ async function dmDeleteSelected() {
 // ============================================================
 // SETTINGS
 // ============================================================
+function onSettingPhotoChange(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (!file.type.match(/image\/(jpeg|png)/)) { showToast('JPG 또는 PNG 파일만 가능합니다.', 'error'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const dataUrl = e.target.result;
+    const preview = document.getElementById('settingPhotoPreview');
+    if (preview) preview.innerHTML = `<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover">`;
+    if (currentUser) currentUser._photoTemp = dataUrl;
+  };
+  reader.readAsDataURL(file);
+}
 function loadSettings() {
   if (!currentUser) return;
   document.getElementById('settingName').value = currentUser.name;
   document.getElementById('settingEmail').value = currentUser.email||'';
   document.getElementById('settingTel').value = currentUser.tel||'';
+  // 사진 미리보기
+  const preview = document.getElementById('settingPhotoPreview');
+  if (preview) {
+    if (currentUser.photo) {
+      preview.innerHTML = `<img src="${currentUser.photo}" style="width:100%;height:100%;object-fit:cover">`;
+    } else {
+      preview.innerHTML = '<span style="font-size:32px;color:#bbb">👤</span>';
+    }
+  }
+  delete currentUser._photoTemp;
   // 서명 미리보기 업데이트
   updateSigPreview();
   // 서명 패드 초기화
@@ -6019,8 +6058,17 @@ function saveSettings() {
   currentUser.name = document.getElementById('settingName').value;
   currentUser.email = document.getElementById('settingEmail').value;
   currentUser.tel = document.getElementById('settingTel').value;
+  if (currentUser._photoTemp) {
+    currentUser.photo = currentUser._photoTemp;
+    delete currentUser._photoTemp;
+  }
   sbSave('users', currentUser.id, currentUser);
   document.getElementById('sideUserName').textContent = currentUser.name;
+  // 사이드바 아바타 업데이트
+  const sideAvatar = document.getElementById('sideAvatar');
+  if (sideAvatar && currentUser.photo) {
+    sideAvatar.innerHTML = `<img src="${currentUser.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+  }
   showToast('설정이 저장되었습니다.','success');
 }
 function saveCompanyInfo() {
