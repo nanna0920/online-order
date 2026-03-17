@@ -3121,15 +3121,15 @@ function renderCal(type) {
     ? (curSelValid ? curSelVal : (selableDepts[0]?.name || ''))
     : null;
 
-  // canEdit:
-  // type=all : 관리자만 편집 (사원 포함 일반 직원 읽기 전용)
-  // type=team: 관리자 또는 해당 팀 구성원 전원 편집 가능 (메모·특이사항 모두)
+  // canEdit: 메뉴 권한(쓰기) 기반으로 편집 가능 여부 결정
+  // type=all(dashboard): dashboard.w 권한 보유 시 편집 가능
+  // type=team(teamCal): teamCal.w 권한 + 해당 팀 구성원인 경우 편집 가능
   let canEdit = false;
   if (type === 'all') {
-    canEdit = !isStaff && isAdmin;
+    canEdit = hasMenuPerm(currentUser, 'dashboard', 'w');
   } else {
     const isMemberTeam = myDeptName === team;
-    canEdit = isAdmin || isMemberTeam; // 팀 구성원 전원 작성 가능
+    canEdit = hasMenuPerm(currentUser, 'teamCal', 'w') && (isAdmin || isMemberTeam);
   }
   const readonlyAttr = canEdit ? '' : 'readonly';
   const taStyle = canEdit ? '' : 'cursor:default;color:var(--text-sub);';
@@ -3968,6 +3968,9 @@ function selectDocForm(formName) {
   // 뷰 전환: 선택 화면 숨기고 에디터 표시
   document.getElementById('docFormSelectorView').style.display = 'none';
   document.getElementById('docFormEditorView').style.display = '';
+  // 기안 제출 버튼: writeDoc 쓰기 권한 없으면 숨김
+  const _submitBtn = document.querySelector('#docFormEditorView .btn-primary[onclick="submitDoc()"]');
+  if (_submitBtn) _submitBtn.style.display = hasMenuPerm(currentUser, 'writeDoc', 'w') ? '' : 'none';
   // 서식 모드로 전환
   // 서식 내용 삽입
   const today = new Date();
@@ -4276,7 +4279,7 @@ function renderMyDocs(filter) {
         <button class="btn btn-sm btn-outline" onclick="viewDoc('${d.id}')">상세</button>
         ${d.status==='approved'?`<button class="btn btn-sm btn-accent" style="background:#1a3a5c;color:#fff" onclick="printDoc('${d.id}')">🖨️ 출력</button>`:''}
         ${d.status==='draft'&&!!(currentUser && (currentUser.role === 'admin' || currentUser.pos === '부원장'))?`<button class="btn btn-sm btn-primary" onclick="editDoc('${d.id}')">✏️ 수정</button>`:''}
-        ${d.status==='draft'?`<button class="btn btn-sm btn-danger" onclick="deleteDoc('${d.id}')">삭제</button>`:''}
+        ${d.status==='draft'&&hasMenuPerm(currentUser,'myDocs','w')?`<button class="btn btn-sm btn-danger" onclick="deleteDoc('${d.id}')">삭제</button>`:''}
       </td>
     </tr>`).join('');
 }
@@ -4406,7 +4409,9 @@ function renderApprovalBox(filter) {
       <td>${d.urgency==='very-urgent'?'<span class="badge" style="background:#c0392b;color:#fff">매우 긴급</span>':d.urgency==='urgent'?'<span class="badge" style="background:#c0392b;color:#fff">긴급</span>':'<span style="color:var(--text-muted)">일반</span>'}</td>
       <td>
         ${filter==='pending'
-          ? `<button class="btn btn-sm btn-primary" onclick="viewDoc('${d.id}')">✅ 결재처리</button>`
+          ? (hasMenuPerm(currentUser,'approvalBox','w')
+              ? `<button class="btn btn-sm btn-primary" onclick="viewDoc('${d.id}')">✅ 결재처리</button>`
+              : `<button class="btn btn-sm btn-outline" onclick="viewDoc('${d.id}')">상세보기</button>`)
           : `<button class="btn btn-sm btn-outline" onclick="viewDoc('${d.id}')">상세보기</button>`
         }
         ${filter==='done'&&d.status==='approved'?`<button class="btn btn-sm btn-secondary" style="background:#1a3a5c;color:#fff" onclick="printDoc('${d.id}')">🖨️ 출력</button>`:''}
@@ -4478,7 +4483,7 @@ function viewDoc(docId) {
 
   // 모달 푸터 버튼 구성
   const footer = document.getElementById('modalDocFooter');
-  if (isApprover) {
+  if (isApprover && hasMenuPerm(currentUser, 'approvalBox', 'w')) {
     footer.innerHTML = `
       <button class="btn btn-success" style="min-width:100px" onclick="processApproval('${doc.id}','approved')">✅ 결재</button>
       <button class="btn btn-danger"  style="min-width:100px" onclick="processApproval('${doc.id}','rejected')">❌ 반려</button>
@@ -5269,6 +5274,8 @@ function moveApprover(idx, dir) {
 // NOTICE
 // ============================================================
 function loadNotice() {
+  const btn = document.getElementById('noticeWriteBtn');
+  if (btn) btn.style.display = hasMenuPerm(currentUser, 'notice', 'w') ? '' : 'none';
   renderNotice(DB.notices);
 }
 function searchNotice(q) {
@@ -5288,7 +5295,7 @@ function renderNotice(list) {
         <div class="notice-content-preview">${n.content}</div>
         <div class="notice-meta">${n.date}${(n.time&&n.date===todayStr)?' '+n.time:''} · ${getUser(n.author).name} · ${getUser(n.author).pos}</div>
       </div>
-      ${!!(currentUser && (currentUser.role === 'admin' || currentUser.pos === '부원장'))?`
+      ${hasMenuPerm(currentUser, 'notice', 'w')?`
         <div style="display:flex;gap:6px" onclick="event.stopPropagation()">
           <button class="btn btn-sm btn-outline no-print" onclick="editNotice(${n.id})">✏️ 수정</button>
           <button class="btn btn-sm btn-danger no-print" onclick="deleteNotice(${n.id})">🗑️ 삭제</button>
@@ -5836,7 +5843,16 @@ function applyMenuPerms(user) {
   // 결재 섹션 헤더: 결재 관련 메뉴가 하나라도 보이거나 관리자면 표시
   const secEl = document.getElementById('navSectionApproval');
   if (secEl) secEl.style.display = (_isAdmin || anyApproval) ? '' : 'none';
-  // 결재라인 설정은 관리자 전용이므로 별도 처리 안 함
+
+  // 현재 활성 페이지 콘텐츠 즉시 재렌더링 (쓰기 버튼 표시/숨김 반영)
+  const activePage = document.querySelector('.page.active');
+  if (!activePage) return;
+  const pageId = activePage.id?.replace('page-', '');
+  if (pageId === 'notice')      { loadNotice(); }
+  else if (pageId === 'dashboard') { try { renderCal('all'); } catch(e){} }
+  else if (pageId === 'teamCal')   { try { renderCal('team'); } catch(e){} }
+  else if (pageId === 'myDocs')    { try { renderMyDocs(currentDocFilter||'all'); } catch(e){} }
+  else if (pageId === 'approvalBox'){ try { renderApprovalBox(approvalFilter||'pending'); } catch(e){} }
 }
 
 // ============================================================
