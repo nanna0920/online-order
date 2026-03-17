@@ -1627,14 +1627,13 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
     </div>
     <div class="modal-body">
       <p style="font-size:13px;color:var(--text-sub);margin-bottom:12px">
-        <b>활성화</b>: 메뉴 사용 여부 / <b>읽기</b>: 조회 가능 / <b>쓰기</b>: 등록·수정·삭제 가능.<br>
-        활성화를 해제하면 읽기·쓰기가 자동으로 비활성화됩니다.
+        <b>활성화</b>: 메뉴 사용 여부 / <b>쓰기</b>: 등록·수정·삭제 가능.<br>
+        활성화를 해제하면 해당 메뉴가 비활성화됩니다.
       </p>
       <input type="hidden" id="menuPermUserId">
-      <div style="display:grid;grid-template-columns:1fr 80px 80px 80px;align-items:center;padding:4px 14px 8px;border-bottom:1.5px solid var(--border);margin-bottom:6px">
+      <div style="display:grid;grid-template-columns:1fr 80px 80px;align-items:center;padding:4px 14px 8px;border-bottom:1.5px solid var(--border);margin-bottom:6px">
         <span style="font-size:12px;color:var(--text-sub);font-weight:600">메뉴</span>
         <span style="font-size:12px;color:var(--text-sub);font-weight:600;text-align:center">⚡ 활성화</span>
-        <span style="font-size:12px;color:var(--text-sub);font-weight:600;text-align:center">👁 읽기</span>
         <span style="font-size:12px;color:var(--text-sub);font-weight:600;text-align:center">✏️ 쓰기</span>
       </div>
       <div id="menuPermList" style="display:flex;flex-direction:column;gap:6px"></div>
@@ -5526,21 +5525,17 @@ function renderMembers(q) {
     } else {
       const perms = getMenuPermsObj(u);
       const rows = MENU_PERMS.map(m => {
-        const r = perms[m.key]?.r;
+        const isActive = !!(perms[m.key]?.r || perms[m.key]?.w);
         const w = perms[m.key]?.w;
-        const isActive = !!(r || w);
         const activeBadge = isActive
           ? `<span style="font-size:10px;background:#fff3e0;color:#b85c00;padding:1px 6px;border-radius:8px;font-weight:700">활성</span>`
           : `<span style="font-size:10px;background:#f0f0f0;color:#bbb;padding:1px 6px;border-radius:8px">비활성</span>`;
-        const rBadge = r
-          ? `<span style="font-size:10px;background:#e8f4ea;color:#1e7e44;padding:1px 6px;border-radius:8px;font-weight:600">읽기</span>`
-          : `<span style="font-size:10px;background:#f0f0f0;color:#ccc;padding:1px 5px;border-radius:8px">읽기</span>`;
         const wBadge = w
           ? `<span style="font-size:10px;background:#eef4ff;color:#1a5cb0;padding:1px 6px;border-radius:8px;font-weight:600">쓰기</span>`
           : `<span style="font-size:10px;background:#f0f0f0;color:#ccc;padding:1px 5px;border-radius:8px">쓰기</span>`;
         return `<div style="display:flex;align-items:center;gap:4px;padding:2px 0;opacity:${isActive?'1':'0.5'}">
           <span style="font-size:11px;min-width:80px;color:${isActive?'var(--text-main)':'#aaa'}">${m.icon} ${m.label}</span>
-          ${activeBadge}${rBadge}${wBadge}
+          ${activeBadge}${wBadge}
         </div>`;
       }).join('');
       menuPermCell = `<div style="display:flex;flex-direction:column;gap:2px">${rows}</div>`;
@@ -5736,24 +5731,19 @@ function hasMenuPerm(user, key, type) {
   return !!(perms[key]?.[type]);
 }
 
-// 활성화 체크박스 변경 시: 읽기·쓰기 연동
+// 활성화 체크박스 변경 시: 쓰기 연동
 function onMenuActiveChange(key) {
   const active = document.getElementById(`mperm_${key}_active`).checked;
-  const rEl = document.getElementById(`mperm_${key}_r`);
   const wEl = document.getElementById(`mperm_${key}_w`);
   const row = document.getElementById(`mperm_row_${key}`);
   if (active) {
-    rEl.disabled = false;
     wEl.disabled = false;
-    rEl.checked = true;
     wEl.checked = true;
     row.style.background = '#fafcff';
     row.style.borderColor = 'var(--border)';
     row.style.opacity = '1';
   } else {
-    rEl.checked = false;
     wEl.checked = false;
-    rEl.disabled = true;
     wEl.disabled = true;
     row.style.background = '#f8f8f8';
     row.style.borderColor = '#e5e5e5';
@@ -5768,12 +5758,11 @@ function openMenuPermModal(uid) {
   document.getElementById('menuPermModalTitle').textContent = `🔐 메뉴 권한 설정 — ${u.name} (${u.pos})`;
   const perms = getMenuPermsObj(u);
   document.getElementById('menuPermList').innerHTML = MENU_PERMS.map(m => {
-    const hasR = !!(perms[m.key]?.r);
     const hasW = !!(perms[m.key]?.w);
-    const isActive = hasR || hasW;
+    const isActive = !!(perms[m.key]?.r || perms[m.key]?.w);
     return `
     <div id="mperm_row_${m.key}"
-         style="display:grid;grid-template-columns:1fr 80px 80px 80px;align-items:center;padding:10px 14px;
+         style="display:grid;grid-template-columns:1fr 80px 80px;align-items:center;padding:10px 14px;
                 border:1.5px solid ${isActive?'var(--border)':'#e5e5e5'};border-radius:var(--radius-sm);
                 background:${isActive?'#fafcff':'#f8f8f8'};opacity:${isActive?'1':'0.7'};transition:.15s">
       <span style="display:flex;align-items:center;gap:8px">
@@ -5786,12 +5775,6 @@ function openMenuPermModal(uid) {
                onchange="onMenuActiveChange('${m.key}')"
                style="width:15px;height:15px;accent-color:#e67e00;cursor:pointer">
         <span style="font-size:11px;font-weight:700;color:${isActive?'#b85c00':'#aaa'}">활성화</span>
-      </label>
-      <label style="display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer;
-                    padding:4px 6px;border-radius:6px;background:${hasR?'#e8f4ea':'#f0f0f0'}">
-        <input type="checkbox" id="mperm_${m.key}_r" ${hasR?'checked':''} ${!isActive?'disabled':''}
-               style="width:15px;height:15px;accent-color:#1e7e44;cursor:pointer">
-        <span style="font-size:11px;font-weight:600;color:${hasR?'#1e7e44':'#aaa'}">읽기</span>
       </label>
       <label style="display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer;
                     padding:4px 6px;border-radius:6px;background:${hasW?'#eef4ff':'#f0f0f0'}">
@@ -5811,13 +5794,12 @@ function saveMenuPerm() {
   const permsObj = {};
   MENU_PERMS.forEach(m => {
     const active = document.getElementById(`mperm_${m.key}_active`)?.checked || false;
-    // 활성화 해제 시 읽기·쓰기 모두 false
-    const r = active && (document.getElementById(`mperm_${m.key}_r`)?.checked || false);
+    // 활성화 = 읽기 허용, 쓰기는 별도 체크박스
     const w = active && (document.getElementById(`mperm_${m.key}_w`)?.checked || false);
-    permsObj[m.key] = {r, w};
+    permsObj[m.key] = {r: active, w};
   });
   u.menuPerms = permsObj;
-  u.menus = MENU_PERMS.map(m => m.key).filter(k => permsObj[k]?.r || permsObj[k]?.w);
+  u.menus = MENU_PERMS.map(m => m.key).filter(k => permsObj[k]?.r);
   sbSave('users', uid, u);
   // 현재 로그인 사용자 본인 권한이 변경된 경우 즉시 반영
   if (currentUser && currentUser.id === uid) {
