@@ -4063,11 +4063,10 @@ function selectDocForm(formName) {
   renderDocApprovalLine();
 
   // 해당 서식에 설정된 결재라인 자동 적용
-  // - docTypes 배열에 서식명이 정확히 포함된 라인만 적용 (빈 배열·'all' 제외)
-  const matchLine = DB.lines.find(l =>
-    Array.isArray(l.docTypes) && l.docTypes.length > 0 &&
-    !l.docTypes.includes('all') && l.docTypes.includes(formName)
-  );
+  // 1순위: 해당 서식명이 명시된 라인 / 2순위: 전체(all) 라인
+  const matchLine =
+    DB.lines.find(l => Array.isArray(l.docTypes) && l.docTypes.includes(formName)) ||
+    DB.lines.find(l => Array.isArray(l.docTypes) && l.docTypes.includes('all'));
   if (matchLine && matchLine.approvers && matchLine.approvers.length > 0) {
     selectedApprovers = [...matchLine.approvers];
     renderDocApprovalLine();
@@ -5137,7 +5136,7 @@ function saveLine() {
   // 현재 문서 기안 화면이 열려 있고, 해당 서식에 매칭되면 즉시 적용
   const curTitle = document.getElementById('docTitle')?.value || '';
   const editorVisible = document.getElementById('docFormEditorView')?.style.display !== 'none';
-  if (editorVisible && curTitle && docTypes.some(dt => dt !== 'all' && curTitle === dt)) {
+  if (editorVisible && curTitle && (docTypes.includes('all') || docTypes.includes(curTitle))) {
     selectedApprovers = [...savedLine.approvers];
     renderDocApprovalLine();
     showToast(`"${savedLine.name}" 결재라인이 현재 문서에 즉시 적용되었습니다.`, 'success');
