@@ -1145,7 +1145,7 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
         <div class="card-body" style="padding:0">
           <div class="table-wrap">
             <table>
-              <thead><tr><th>이름</th><th>아이디</th><th>부서</th><th>직위</th><th>이메일</th><th>상태</th><th>권한</th><th>관리</th></tr></thead>
+              <thead><tr><th>이름</th><th>아이디</th><th>부서</th><th>직위</th><th>이메일</th><th>상태</th><th>권한</th><th style="min-width:200px">메뉴 권한</th><th>관리</th></tr></thead>
               <tbody id="membersTbody"></tbody>
             </table>
           </div>
@@ -1620,17 +1620,22 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
 
 <!-- 메뉴 권한 설정 모달 -->
 <div class="modal-overlay" id="menuPermModal">
-  <div class="modal" style="max-width:460px">
+  <div class="modal" style="max-width:520px">
     <div class="modal-header">
       <h3 id="menuPermModalTitle">🔐 메뉴 권한 설정</h3>
       <button class="modal-close" onclick="closeModal('menuPermModal')">×</button>
     </div>
     <div class="modal-body">
-      <p style="font-size:13px;color:var(--text-sub);margin-bottom:16px">
-        체크된 메뉴만 해당 구성원에게 표시됩니다. 관리자 전용 메뉴는 역할에 따라 자동 적용됩니다.
+      <p style="font-size:13px;color:var(--text-sub);margin-bottom:12px">
+        메뉴별 읽기·쓰기 권한을 설정합니다. <b>읽기</b>: 메뉴 조회 가능 / <b>쓰기</b>: 등록·수정·삭제 가능.<br>관리자 전용 메뉴는 역할에 따라 자동 적용됩니다.
       </p>
       <input type="hidden" id="menuPermUserId">
-      <div id="menuPermList" style="display:flex;flex-direction:column;gap:10px"></div>
+      <div style="display:grid;grid-template-columns:1fr 76px 76px;align-items:center;padding:4px 14px 8px;border-bottom:1.5px solid var(--border);margin-bottom:6px">
+        <span style="font-size:12px;color:var(--text-sub);font-weight:600">메뉴</span>
+        <span style="font-size:12px;color:var(--text-sub);font-weight:600;text-align:center">👁 읽기</span>
+        <span style="font-size:12px;color:var(--text-sub);font-weight:600;text-align:center">✏️ 쓰기</span>
+      </div>
+      <div id="menuPermList" style="display:flex;flex-direction:column;gap:8px"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('menuPermModal')">취소</button>
@@ -2941,10 +2946,11 @@ const pageTitles = {
 };
 
 function showPage(name, navEl) {
-  // 메뉴 권한 체크 (관리자 제외, 권한 설정된 메뉴 키만 차단)
+  // 메뉴 권한 체크 (관리자 제외, 읽기 또는 쓰기 권한이 없으면 차단)
   if (currentUser && !isAdmin(currentUser) && MENU_PERMS.some(m=>m.key===name)) {
-    const allowed = Array.isArray(currentUser.menus) ? currentUser.menus : MENU_PERMS.map(m=>m.key);
-    if (!allowed.includes(name)) { showToast('해당 메뉴에 대한 접근 권한이 없습니다.','error'); return; }
+    if (!hasMenuPerm(currentUser, name, 'r') && !hasMenuPerm(currentUser, name, 'w')) {
+      showToast('해당 메뉴에 대한 접근 권한이 없습니다.','error'); return;
+    }
   }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -3420,12 +3426,11 @@ function calSaveEditor() {
   const isAdmin = !!(currentUser && (currentUser.role === 'admin' || currentUser.pos === '부원장'));
   const uid = currentUser?.id || '';
   const myDeptName = currentUser?.dept || '';
-  const isStaff = currentUser?.pos === '사원';
   const isMember = myDeptName === team;
-  // type=all: 사원은 읽기 전용, 관리자만 저장 가능
-  if (type === 'all' && isStaff) { showToast('사원은 조회만 가능합니다.', 'error'); return; }
-  if (type === 'all' && !isAdmin) { showToast('관리자만 저장할 수 있습니다.', 'error'); return; }
-  // type=team: 해당 팀 구성원 전원 저장 가능 (메모 및 특이사항 모두)
+  // type=all: 기관 월간 행사 쓰기 권한 필요
+  if (type === 'all' && !hasMenuPerm(currentUser, 'dashboard', 'w')) { showToast('기관 월간 행사 쓰기 권한이 없습니다.', 'error'); return; }
+  // type=team: 팀별 월간 행사 쓰기 권한 + 해당 팀 구성원이어야 저장 가능
+  if (type === 'team' && !isAdmin && !hasMenuPerm(currentUser, 'teamCal', 'w')) { showToast('팀별 월간 행사 쓰기 권한이 없습니다.', 'error'); return; }
   if (type === 'team' && !isAdmin && !isMember) { showToast('해당 팀 구성원만 저장할 수 있습니다.', 'error'); return; }
 
   const content = document.getElementById('calEditorArea').innerHTML.trim();
@@ -4118,6 +4123,7 @@ function saveDraft() {
 }
 
 function submitDoc() {
+  if (!isAdmin(currentUser) && !hasMenuPerm(currentUser, 'writeDoc', 'w')) { showToast('문서 기안 쓰기 권한이 없습니다.', 'error'); return; }
   const title = document.getElementById('docTitle').value.trim();
   const editorEl = document.getElementById('docContent');
   const content = serializeEditorHTML(editorEl);
@@ -4528,6 +4534,7 @@ function quickProcessApproval(docId, action) {
 }
 
 function processApproval(docId, action) {
+  if (!isAdmin(currentUser) && !hasMenuPerm(currentUser, 'approvalBox', 'w')) { showToast('결재함 쓰기 권한이 없습니다.', 'error'); return; }
   const doc = DB.docs.find(d=>d.id===docId);
   if (!doc) return;
   const opinion = document.getElementById('approvalOpinion')?.value || '';
@@ -5309,6 +5316,7 @@ function showNoticeDetail(id) {
 }
 
 function deleteNotice(id) {
+  if (!isAdmin(currentUser) && !hasMenuPerm(currentUser, 'notice', 'w')) { showToast('공지사항 쓰기 권한이 없습니다.', 'error'); return; }
   if (!confirm('공지사항을 삭제하시겠습니까?')) return;
   const i = DB.notices.findIndex(n=>n.id===id);
   if (i>-1) DB.notices.splice(i,1);
@@ -5370,6 +5378,7 @@ function editNotice(id) {
 }
 
 function saveNotice() {
+  if (!isAdmin(currentUser) && !hasMenuPerm(currentUser, 'notice', 'w')) { showToast('공지사항 쓰기 권한이 없습니다.', 'error'); return; }
   const title = document.getElementById('noticeTitle').value.trim();
   const content = document.getElementById('noticeEditor').innerHTML.trim();
   const editId = document.getElementById('noticeEditId').value;
@@ -5482,7 +5491,35 @@ function renderMembers(q) {
   let users = DB.users;
   if (q) users = users.filter(u=>u.name.includes(q)||u.dept.includes(q)||u.id.includes(q));
   const tbody = document.getElementById('membersTbody');
-  tbody.innerHTML = users.map(u=>`
+  const _curIsAdmin = !!(currentUser && (currentUser.role === 'admin' || currentUser.pos === '부원장'));
+  tbody.innerHTML = users.map(u => {
+    const uIsAdmin = u.role === 'admin' || u.pos === '부원장';
+    // 메뉴 권한 요약 셀 생성
+    let menuPermCell;
+    if (uIsAdmin) {
+      menuPermCell = `<span style="font-size:12px;color:var(--text-sub);font-style:italic">관리자 (전체 허용)</span>`;
+    } else {
+      const perms = getMenuPermsObj(u);
+      const rows = MENU_PERMS.map(m => {
+        const r = perms[m.key]?.r;
+        const w = perms[m.key]?.w;
+        const rBadge = r
+          ? `<span style="font-size:10px;background:#e8f4ea;color:#1e7e44;padding:1px 6px;border-radius:8px;font-weight:600">읽기</span>`
+          : `<span style="font-size:10px;background:#f0f0f0;color:#aaa;padding:1px 6px;border-radius:8px">읽기</span>`;
+        const wBadge = w
+          ? `<span style="font-size:10px;background:#eef4ff;color:#1a5cb0;padding:1px 6px;border-radius:8px;font-weight:600">쓰기</span>`
+          : `<span style="font-size:10px;background:#f0f0f0;color:#aaa;padding:1px 6px;border-radius:8px">쓰기</span>`;
+        return `<div style="display:flex;align-items:center;gap:4px;padding:2px 0">
+          <span style="font-size:11px;min-width:80px;color:var(--text-main)">${m.icon} ${m.label}</span>
+          ${rBadge}${wBadge}
+        </div>`;
+      }).join('');
+      const setBtn = _curIsAdmin
+        ? `<button class="btn btn-sm" style="margin-top:6px;background:#eef4ff;color:#1a5cb0;border:1px solid #b8d0f5;font-size:11px;padding:3px 10px" onclick="openMenuPermModal('${u.id}')">🔐 권한 설정</button>`
+        : '';
+      menuPermCell = `<div style="display:flex;flex-direction:column;gap:1px">${rows}${setBtn}</div>`;
+    }
+    return `
     <tr>
       <td><div style="display:flex;align-items:center;gap:8px"><div style="width:30px;height:30px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">${u.name[0]}</div>${u.name}</div></td>
       <td style="color:var(--text-sub)">${u.id}</td>
@@ -5491,16 +5528,17 @@ function renderMembers(q) {
       <td style="font-size:12px;color:var(--text-sub)">${u.email||'-'}</td>
       <td><span class="badge ${u.active?'badge-approved':'badge-rejected'}">${u.active?'활성':'비활성'}</span></td>
       <td><span class="badge ${u.role==='admin'?'badge-notice':'badge-draft'}">${u.role==='admin'?'관리자':'사용자'}</span></td>
+      <td style="vertical-align:top;padding-top:10px">${menuPermCell}</td>
       <td>
-        ${!!(currentUser && (currentUser.role === 'admin' || currentUser.pos === '부원장'))?`
+        ${_curIsAdmin?`
           <button class="btn btn-sm btn-secondary" onclick="editMember('${u.id}')">✏️ 수정</button>
           <button class="btn btn-sm btn-outline" onclick="toggleUserActive('${u.id}')">${u.active?'비활성화':'활성화'}</button>
           <button class="btn btn-sm" style="background:#f0f4f8;color:var(--primary)" onclick="toggleUserRole('${u.id}')">${u.role==='admin'?'일반으로':'관리자로'}</button>
-          ${u.role !== 'admin' ? `<button class="btn btn-sm" style="background:#eef4ff;color:#1a5cb0;border:1px solid #b8d0f5" onclick="openMenuPermModal('${u.id}')">🔐 권한</button>` : ''}
           ${u.id !== currentUser.id ? `<button class="btn btn-sm btn-danger" onclick="deleteMember('${u.id}')">🗑️ 삭제</button>` : ''}
         `:''}
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 
 // ============================================================
@@ -5649,19 +5687,44 @@ const MENU_PERMS = [
   {key:'approvalBox', label:'결재함',            icon:'📥'},
 ];
 
+// user.menuPerms = { [key]: {r:bool, w:bool} } 구조로 읽기/쓰기 권한 관리
+// 구버전 user.menus(배열) 하위 호환 지원
+function getMenuPermsObj(user) {
+  if (user.menuPerms && typeof user.menuPerms === 'object' && !Array.isArray(user.menuPerms)) return user.menuPerms;
+  const menus = Array.isArray(user.menus) ? user.menus : MENU_PERMS.map(m => m.key);
+  const obj = {};
+  MENU_PERMS.forEach(m => { obj[m.key] = menus.includes(m.key) ? {r:true, w:true} : {r:false, w:false}; });
+  return obj;
+}
+
+// type: 'r'(읽기) 또는 'w'(쓰기) — 관리자는 항상 true
+function hasMenuPerm(user, key, type) {
+  if (!user) return false;
+  if (isAdmin(user)) return true;
+  const perms = getMenuPermsObj(user);
+  return !!(perms[key]?.[type]);
+}
+
 function openMenuPermModal(uid) {
   const u = getUser(uid);
   if (!u) return;
   document.getElementById('menuPermUserId').value = uid;
   document.getElementById('menuPermModalTitle').textContent = `🔐 메뉴 권한 설정 — ${u.name} (${u.pos})`;
-  const allowed = Array.isArray(u.menus) ? u.menus : MENU_PERMS.map(m => m.key);
+  const perms = getMenuPermsObj(u);
   document.getElementById('menuPermList').innerHTML = MENU_PERMS.map(m => `
-    <label style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:.15s"
-           onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
-      <input type="checkbox" id="mperm_${m.key}" value="${m.key}" ${allowed.includes(m.key)?'checked':''} style="width:16px;height:16px;accent-color:var(--primary);cursor:pointer">
-      <span style="font-size:16px">${m.icon}</span>
-      <span style="font-size:14px;font-weight:500">${m.label}</span>
-    </label>`).join('');
+    <div style="display:grid;grid-template-columns:1fr 76px 76px;align-items:center;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);transition:.15s"
+         onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
+      <span style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:16px">${m.icon}</span>
+        <span style="font-size:14px;font-weight:500">${m.label}</span>
+      </span>
+      <label style="display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer">
+        <input type="checkbox" id="mperm_${m.key}_r" ${perms[m.key]?.r?'checked':''} style="width:15px;height:15px;accent-color:var(--primary);cursor:pointer">
+      </label>
+      <label style="display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer">
+        <input type="checkbox" id="mperm_${m.key}_w" ${perms[m.key]?.w?'checked':''} style="width:15px;height:15px;accent-color:var(--primary);cursor:pointer">
+      </label>
+    </div>`).join('');
   openModal('menuPermModal');
 }
 
@@ -5669,7 +5732,15 @@ function saveMenuPerm() {
   const uid = document.getElementById('menuPermUserId').value;
   const u = getUser(uid);
   if (!u) return;
-  u.menus = MENU_PERMS.map(m => m.key).filter(k => document.getElementById('mperm_'+k)?.checked);
+  const permsObj = {};
+  MENU_PERMS.forEach(m => {
+    const r = document.getElementById(`mperm_${m.key}_r`)?.checked || false;
+    const w = document.getElementById(`mperm_${m.key}_w`)?.checked || false;
+    permsObj[m.key] = {r, w};
+  });
+  u.menuPerms = permsObj;
+  // 하위 호환: 읽기 또는 쓰기 권한이 있는 메뉴를 menus 배열로 유지
+  u.menus = MENU_PERMS.map(m => m.key).filter(k => permsObj[k]?.r || permsObj[k]?.w);
   sbSave('users', uid, u);
   closeModal('menuPermModal');
   showToast(`${u.name}님 메뉴 권한이 저장되었습니다.`, 'success');
@@ -5677,7 +5748,7 @@ function saveMenuPerm() {
 
 function applyMenuPerms(user) {
   const _isAdmin = isAdmin(user);
-  const allowed = _isAdmin ? null : (Array.isArray(user.menus) ? user.menus : MENU_PERMS.map(m => m.key));
+  const perms = _isAdmin ? null : getMenuPermsObj(user);
   const navMap = {
     dashboard:'navDashboard', notice:'navNotice', teamCal:'navTeamCal',
     writeDoc:'navWriteDoc', myDocs:'navMyDocs', approvalBox:'navApprovalBox'
@@ -5686,7 +5757,7 @@ function applyMenuPerms(user) {
   MENU_PERMS.forEach(m => {
     const el = document.getElementById(navMap[m.key]);
     if (!el) return;
-    const show = _isAdmin || !allowed || allowed.includes(m.key);
+    const show = _isAdmin || !perms || (perms[m.key]?.r || perms[m.key]?.w);
     el.style.display = show ? '' : 'none';
     if (['writeDoc','myDocs','approvalBox'].includes(m.key) && show) anyApproval = true;
   });
