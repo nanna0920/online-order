@@ -1935,6 +1935,23 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
       </div>
       <div class="form-group"><label>이메일</label><input type="email" id="memberEditEmail" placeholder="example@company.com"></div>
       <div class="form-group"><label>연락처</label><input type="tel" id="memberEditTel" placeholder="010-0000-0000"></div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;justify-content:space-between">
+          <span>서명</span>
+          <span style="display:flex;gap:6px">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="clearMemberSign()" style="font-size:11px;padding:2px 8px">지우기</button>
+            <label class="btn btn-sm btn-secondary" style="font-size:11px;padding:2px 8px;cursor:pointer;margin:0">
+              이미지 불러오기<input type="file" id="memberSignFile" accept="image/*" style="display:none" onchange="loadMemberSignImg(this)">
+            </label>
+          </span>
+        </label>
+        <div style="border:1.5px solid var(--border);border-radius:var(--radius-sm);background:#fff;position:relative;overflow:hidden">
+          <canvas id="memberSignCanvas" width="420" height="100"
+                  style="display:block;width:100%;height:100px;touch-action:none;cursor:crosshair"></canvas>
+          <span id="memberSignPlaceholder" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+                font-size:12px;color:#ccc;pointer-events:none;white-space:nowrap">마우스나 터치로 서명하세요</span>
+        </div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('memberEditModal')">취소</button>
@@ -5638,7 +5655,82 @@ function editMember(uid) {
   document.getElementById('memberEditPos').value = u.pos||'';
   // 담당직종
   document.getElementById('memberEditJob').value = u.job||'';
+  // 서명 캔버스 초기화
+  _initMemberSignCanvas(u.signature||null);
   openModal('memberEditModal');
+}
+
+let _memberSignDrawing = false;
+function _initMemberSignCanvas(existingDataUrl) {
+  const canvas = document.getElementById('memberSignCanvas');
+  const ctx = canvas.getContext('2d');
+  const ph = document.getElementById('memberSignPlaceholder');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = '#1a1a2e';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  // 기존 서명 이미지 로드
+  if (existingDataUrl) {
+    const img = new Image();
+    img.onload = () => { ctx.drawImage(img, 0, 0, canvas.width, canvas.height); };
+    img.src = existingDataUrl;
+    if (ph) ph.style.display = 'none';
+  } else {
+    if (ph) ph.style.display = '';
+  }
+  // 이벤트 중복 방지: 기존 리스너 제거 후 재등록
+  const nc = canvas.cloneNode(true);
+  canvas.parentNode.replaceChild(nc, canvas);
+  const c = document.getElementById('memberSignCanvas');
+  const cx = c.getContext('2d');
+  cx.strokeStyle = '#1a1a2e'; cx.lineWidth = 2; cx.lineCap = 'round'; cx.lineJoin = 'round';
+  if (existingDataUrl) { const img=new Image(); img.onload=()=>cx.drawImage(img,0,0,c.width,c.height); img.src=existingDataUrl; }
+  function pos(e) {
+    const r = c.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return [(t.clientX-r.left)*(c.width/r.width), (t.clientY-r.top)*(c.height/r.height)];
+  }
+  function start(e) {
+    e.preventDefault(); _memberSignDrawing=true;
+    const [x,y]=pos(e); cx.beginPath(); cx.moveTo(x,y);
+    if (ph) ph.style.display='none';
+  }
+  function move(e) {
+    if (!_memberSignDrawing) return; e.preventDefault();
+    const [x,y]=pos(e); cx.lineTo(x,y); cx.stroke();
+  }
+  function end() { _memberSignDrawing=false; }
+  c.addEventListener('mousedown',start); c.addEventListener('mousemove',move);
+  c.addEventListener('mouseup',end); c.addEventListener('mouseleave',end);
+  c.addEventListener('touchstart',start,{passive:false}); c.addEventListener('touchmove',move,{passive:false});
+  c.addEventListener('touchend',end);
+}
+function clearMemberSign() {
+  const c = document.getElementById('memberSignCanvas');
+  c.getContext('2d').clearRect(0,0,c.width,c.height);
+  const ph = document.getElementById('memberSignPlaceholder');
+  if (ph) ph.style.display='';
+}
+function loadMemberSignImg(input) {
+  if (!input.files || !input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.getElementById('memberSignCanvas');
+      const cx = c.getContext('2d');
+      cx.clearRect(0,0,c.width,c.height);
+      // 비율 유지하여 캔버스에 맞게 그리기
+      const scale = Math.min(c.width/img.width, c.height/img.height);
+      const w=img.width*scale, h=img.height*scale;
+      cx.drawImage(img, (c.width-w)/2, (c.height-h)/2, w, h);
+      const ph=document.getElementById('memberSignPlaceholder'); if(ph) ph.style.display='none';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(input.files[0]);
+  input.value='';
 }
 
 function saveMemberEdit() {
@@ -5661,6 +5753,11 @@ function saveMemberEdit() {
   u.tel   = document.getElementById('memberEditTel').value.trim();
   const newPw = document.getElementById('memberEditPw').value;
   if (newPw) u.pw = newPw;
+  // 서명 저장 (캔버스가 비어 있으면 기존 값 유지)
+  const signCanvas = document.getElementById('memberSignCanvas');
+  const signData = signCanvas ? signCanvas.toDataURL('image/png') : null;
+  const isBlank = signCanvas ? !signCanvas.getContext('2d').getImageData(0,0,signCanvas.width,signCanvas.height).data.some(v=>v!==0) : true;
+  if (!isBlank) u.signature = signData; else delete u.signature;
   sbSave('users', uid, u);
   closeModal('memberEditModal');
   renderMembers('');
