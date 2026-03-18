@@ -747,6 +747,9 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
 }
 .mobile-nav-item.active { color:var(--primary); }
 .mobile-nav-item .mn-icon { font-size:22px; line-height:1; }
+.mn-cal-icon { display:inline-flex; flex-direction:column; align-items:center; justify-content:flex-start; width:28px; height:28px; border:1.5px solid var(--primary); border-radius:4px; overflow:hidden; font-size:10px; line-height:1; background:var(--surface); }
+.mn-cal-icon .mn-cal-top { width:100%; background:var(--primary); color:#fff; font-size:8px; font-weight:700; text-align:center; padding:2px 0; line-height:1.2; letter-spacing:0.2px; }
+.mn-cal-icon .mn-cal-day { flex:1; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; color:var(--primary); line-height:1; }
 .mobile-nav-badge {
   position:absolute; top:4px; right:calc(50% - 18px);
   background:var(--danger); color:#fff; font-size:9px; font-weight:700;
@@ -1591,7 +1594,7 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
   <!-- 모바일 하단 네비게이션 -->
   <nav class="mobile-bottom-nav" id="mobileBottomNav">
     <button class="mobile-nav-item" id="mnDashboard" onclick="showPage('dashboard',null);closeMobileSidebar()">
-      <span class="mn-icon">📅</span><span>행사</span>
+      <span class="mn-icon mn-cal-icon" id="mnCalIcon"><span class="mn-cal-top" id="mnCalTop"></span><span class="mn-cal-day" id="mnCalDay"></span></span><span>행사</span>
     </button>
     <button class="mobile-nav-item" id="mnNotice" onclick="showPage('notice',null);closeMobileSidebar()">
       <span class="mn-icon">📢</span><span>공지</span>
@@ -3236,6 +3239,7 @@ function _applyLogin(user, showWelcome) {
   requestBrowserNotifPermission();
   _checkIosA2hsBanner();
   _requestWakeLock();
+  _updateMobileCalIcon();
   _loginTs = Date.now();
   initRealtime();
   showPage('dashboard', null);
@@ -8810,6 +8814,16 @@ function closeMobileSidebar() {
   if (sidebar) sidebar.classList.remove('open');
   if (overlay) overlay.classList.remove('show');
   if (btn) btn.classList.remove('open');
+}
+
+// 모바일 하단 네비 달력 아이콘에 오늘 날짜 표시
+function _updateMobileCalIcon() {
+  const d = new Date();
+  const months = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  const topEl = document.getElementById('mnCalTop');
+  const dayEl = document.getElementById('mnCalDay');
+  if (topEl) topEl.textContent = months[d.getMonth()];
+  if (dayEl) dayEl.textContent = d.getDate();
 }
 
 // 모바일 하단 네비 활성 탭 동기화 (showPage 호출 시 연동)
