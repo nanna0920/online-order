@@ -2014,6 +2014,21 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
   </div>
 </div>
 
+<!-- iOS 홈 화면 추가 안내 배너 (iOS Safari에서 PWA 미설치 시 표시) -->
+<div id="iosA2hsBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:9999;
+     background:#1a3a5c;color:#fff;padding:14px 16px 20px;font-size:14px;line-height:1.6;
+     box-shadow:0 -4px 16px rgba(0,0,0,.35)">
+  <button onclick="_dismissIosA2hs()" style="float:right;background:none;border:none;color:#fff;font-size:20px;line-height:1;cursor:pointer;padding:0 4px">×</button>
+  <div style="font-weight:700;font-size:15px;margin-bottom:6px">📲 앱 설치 후 알림 받기 (iOS)</div>
+  <div>iPhone/iPad에서 백그라운드 알림을 받으려면 홈 화면에 앱을 설치해야 합니다.</div>
+  <div style="margin-top:8px">
+    <span style="background:#fff;color:#1a3a5c;padding:2px 8px;border-radius:4px;font-weight:700">Safari</span>
+    하단 공유 버튼(
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" style="vertical-align:middle"><path d="M8 10l4-6 4 6M12 4v13M5 18h14"/></svg>
+    ) → <strong>홈 화면에 추가</strong> → 설치 후 알림 허용
+  </div>
+</div>
+
 <!-- 서식 미리보기 모달 -->
 <div class="modal-overlay" id="tplPreviewModal" style="z-index:1500">
   <div class="modal" style="max-width:1010px;width:96vw">
@@ -2539,6 +2554,16 @@ function _urlBase64ToUint8Array(base64String) {
   return output;
 }
 
+// 이 기기 고유 ID (localStorage 보존) - 기기별로 다른 push 구독 키 생성
+function _getDeviceKey() {
+  let k = localStorage.getItem('_push_device_key');
+  if (!k) {
+    k = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+    localStorage.setItem('_push_device_key', k);
+  }
+  return k;
+}
+
 async function subscribePush() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
   if (Notification.permission !== 'granted') return;
@@ -2552,11 +2577,13 @@ async function subscribePush() {
         applicationServerKey: _urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
       });
     }
-    const subId = 'push-' + currentUser.id;
+    // 기기별 고유 키 사용 → 스마트폰/PC 각각 독립적으로 알림 수신 가능
+    const deviceKey = _getDeviceKey();
+    const subId = 'push-' + currentUser.id + '-' + deviceKey;
     await sb.from('e_approval').upsert({
       id: subId,
       type: 'push_subscription',
-      data: { userId: currentUser.id, subscription: sub.toJSON() },
+      data: { userId: currentUser.id, subscription: sub.toJSON(), deviceKey },
       updated_at: new Date().toISOString()
     });
   } catch(e) { console.warn('Push subscribe 오류:', e); }
@@ -3166,6 +3193,7 @@ function _applyLogin(user, showWelcome) {
   _localChanges.clear();
   clearTabFlash(); _origTitle = document.title;
   requestBrowserNotifPermission();
+  _checkIosA2hsBanner();
   _requestWakeLock();
   _loginTs = Date.now();
   initRealtime();
@@ -6563,6 +6591,10 @@ function requestBrowserNotifPermission() {
     Notification.requestPermission().then(() => updateNotifPermBtn());
   }
   updateNotifPermBtn();
+  // 이미 허용된 경우 구독 갱신 (로그인마다 최신 구독을 DB에 저장)
+  if ('Notification' in window && Notification.permission === 'granted') {
+    subscribePush();
+  }
 }
 
 function updateNotifPermBtn() {
@@ -6585,15 +6617,54 @@ function updateNotifPermBtn() {
   }
 }
 
+// iOS 감지 헬퍼
+function _isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+}
+function _isStandalone() {
+  return navigator.standalone === true ||
+         window.matchMedia('(display-mode: standalone)').matches;
+}
+
+// iOS 홈 화면 추가 배너 표시/닫기
+function _showIosA2hsBanner() {
+  const banner = document.getElementById('iosA2hsBanner');
+  if (banner) banner.style.display = '';
+}
+function _dismissIosA2hs() {
+  const banner = document.getElementById('iosA2hsBanner');
+  if (banner) banner.style.display = 'none';
+  localStorage.setItem('_iosA2hsDismissed', Date.now());
+}
+
+// 로그인 후 iOS 비설치 상태면 배너 표시 (7일에 한 번)
+function _checkIosA2hsBanner() {
+  if (!_isIOS() || _isStandalone()) return;
+  const dismissed = parseInt(localStorage.getItem('_iosA2hsDismissed') || '0');
+  if (Date.now() - dismissed < 7 * 24 * 3600 * 1000) return;
+  setTimeout(_showIosA2hsBanner, 2000);
+}
+
 function onNotifPermBtnClick() {
   if (!('Notification' in window)) {
-    showToast('이 브라우저는 알림을 지원하지 않습니다.', 'warning'); return;
+    // iOS Safari (비PWA) - 알림 API 없음
+    if (_isIOS() && !_isStandalone()) {
+      _showIosA2hsBanner();
+    } else {
+      showToast('이 브라우저는 알림을 지원하지 않습니다.', 'warning');
+    }
+    return;
   }
   if (Notification.permission === 'granted') {
     showToast('알림이 활성화되어 있습니다. 🔔', 'success'); return;
   }
   if (Notification.permission === 'denied') {
     showToast('알림이 차단되었습니다. 브라우저 주소창의 자물쇠(🔒) 아이콘 → 알림 → 허용 으로 변경해 주세요.', 'warning'); return;
+  }
+  // iOS PWA: 알림 권한 요청 가능
+  if (_isIOS() && !_isStandalone()) {
+    _showIosA2hsBanner();
+    return;
   }
   // default: 사용자 클릭(제스처)으로 권한 요청
   Notification.requestPermission().then(p => {
