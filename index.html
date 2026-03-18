@@ -937,6 +937,31 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
   </div>
 </div>
 
+<!-- Android 수동 설치 안내 모달 (Firefox, Opera, Brave 등) -->
+<div id="pwaAndroidModal">
+  <div class="pwa-ios-backdrop" onclick="closePwaAndroidModal()"></div>
+  <div class="pwa-ios-sheet">
+    <h3>📲 홈 화면에 앱 추가</h3>
+    <p>아래 순서대로 따라하시면 앱처럼 설치됩니다</p>
+    <div class="pwa-ios-steps">
+      <div class="pwa-ios-step">
+        <div class="step-num">1</div>
+        <div class="step-desc">브라우저 우측 상단 <strong>메뉴(⋮)</strong>를 탭하세요</div>
+      </div>
+      <div class="pwa-ios-step">
+        <div class="step-num">2</div>
+        <div class="step-desc"><strong>'홈 화면에 추가'</strong> 또는 <strong>'앱 설치'</strong>를 선택하세요</div>
+      </div>
+      <div class="pwa-ios-step">
+        <div class="step-num">3</div>
+        <div class="step-desc"><strong>'추가'</strong> 버튼을 탭하면 설치 완료!</div>
+      </div>
+    </div>
+    <div class="pwa-ios-arrow-hint">⋮ 브라우저 오른쪽 상단 메뉴를 탭하세요</div>
+    <button class="pwa-ios-close" onclick="closePwaAndroidModal()">확인</button>
+  </div>
+</div>
+
 <!-- REGISTER PAGE -->
 <div id="registerPage" style="display:none">
   <div class="register-wrap">
@@ -8280,6 +8305,8 @@ const _isMobile = _isIOS || _isAndroid || window.innerWidth <= 768;
 const _isStandalone =
   window.matchMedia('(display-mode: standalone)').matches ||
   window.navigator.standalone === true;
+// 인앱브라우저 감지 (카카오톡, 네이버, 인스타, 페이스북 등 WebView 기반)
+const _isInAppBrowser = /KAKAOTALK|kakaotalk|NAVER\/|naver\/|Instagram|FBAV|FB_IAB|Line\/[0-9]|MicroMessenger|Whale\/|DaumApps/i.test(navigator.userAgent);
 
 let _pwaInstallPrompt = null;
 
@@ -8350,11 +8377,23 @@ function installPWA() {
     return;
   }
 
-  // ③ Android 인앱브라우저·Firefox 등 → Chrome/삼성 인터넷으로 유도
+  // ③ Android
   if (_isAndroid) {
-    showToast('Chrome 또는 삼성 인터넷 브라우저에서 열면 앱을 설치할 수 있어요', 'info');
+    if (_isInAppBrowser) {
+      // 카카오톡·네이버·인스타 등 인앱 WebView: PWA 설치 불가 → Chrome으로 유도
+      showToast('Chrome 또는 삼성 인터넷 앱에서 이 페이지를 열어주세요', 'info');
+    } else {
+      // Firefox·Opera·Brave 등 일반 브라우저: 메뉴에서 직접 설치 가능
+      const modal = document.getElementById('pwaAndroidModal');
+      if (modal) modal.style.display = 'block';
+    }
     return;
   }
+}
+
+function closePwaAndroidModal() {
+  const modal = document.getElementById('pwaAndroidModal');
+  if (modal) modal.style.display = 'none';
 }
 
 function dismissPWAInstall() {
