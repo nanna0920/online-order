@@ -163,6 +163,9 @@ body { font-family:'Noto Sans KR',sans-serif; background:var(--bg); color:var(--
 /* 상단 새 알림 뱃지 */
 #topNewAlert { display:none; padding:5px 14px; background:#e74c3c; color:#fff; font-size:12px; font-weight:700; border-radius:20px; cursor:pointer; white-space:nowrap; letter-spacing:0.3px; animation:topAlertBlink 0.8s ease-in-out infinite; max-width:220px; overflow:hidden; text-overflow:ellipsis; }
 @keyframes topAlertBlink { 0%,100%{opacity:1;box-shadow:0 0 8px rgba(231,76,60,0.7);} 50%{opacity:0.25;box-shadow:none;} }
+@keyframes newBadgeBlink { 0%,100%{opacity:1} 50%{opacity:0} }
+.new-badge-cal { display:inline-block; color:#e74c3c; font-weight:700; font-size:10px; margin-left:3px; animation:newBadgeBlink 1s step-start infinite; vertical-align:middle; line-height:1; }
+.new-badge-notice { display:inline-block; background:#e74c3c; color:#fff; font-weight:700; font-size:10px; border-radius:3px; padding:1px 5px; margin-left:5px; animation:newBadgeBlink 1s step-start infinite; vertical-align:middle; line-height:1.4; }
 .icon-btn { width:36px; height:36px; border:none; background:var(--surface2); border-radius:var(--radius-sm); cursor:pointer; font-size:16px; display:flex;align-items:center;justify-content:center; transition:all .2s; color:var(--text-sub); position:relative; }
 .icon-btn:hover { background:var(--border); color:var(--primary); }
 .icon-btn .badge { position:absolute; top:4px; right:4px; width:8px; height:8px; background:var(--danger); border-radius:50%; }
@@ -3536,7 +3539,19 @@ function renderCal(type) {
   const memos = (type === 'all' ? DB.memoAll : DB.memoTeam.filter(m => m.team === team))
                   .filter(m => m.date.startsWith(monthPfx));
   const memoMap = {};
-  memos.forEach(m => { memoMap[m.date] = m.content; });
+  const memoNewMap = {}; // {date → true} : 오늘 등록된 메모
+  const _todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  memos.forEach(m => {
+    memoMap[m.date] = m.content;
+    // ID 마지막 숫자 부분이 Date.now() 타임스탬프
+    const _ts = parseInt(String(m.id).split('-').pop());
+    if (!isNaN(_ts) && _ts > 1e12) {
+      const _d = new Date(_ts);
+      if (_d.getFullYear() === today.getFullYear() && _d.getMonth() === today.getMonth() && _d.getDate() === today.getDate()) {
+        memoNewMap[m.date] = true;
+      }
+    }
+  });
 
   // type=all: 팀별 메모도 날짜별로 수집 {date → [{team, content}]}
   const teamMemosByDate = {};
@@ -3584,8 +3599,9 @@ function renderCal(type) {
       ).join('');
     }
 
+    const newBadgeCal = (memoNewMap[ds] && content) ? '<span class="new-badge-cal">NEW</span>' : '';
     cells += `<td class="${tdCls}" ${tdClickHandler}>
-      <div class="cal-date-num">${d}</div>
+      <div class="cal-date-num">${d}${newBadgeCal}</div>
       <div class="${previewCls}">${content}</div>
       ${teamRows}
     </td>`;
@@ -5721,7 +5737,7 @@ function renderNotice(list) {
       <div style="min-width:28px;text-align:center;font-size:12px;font-weight:600;color:var(--text-sub);flex-shrink:0">${i+1}</div>
       ${n.pin?'<span class="notice-pin">📌 중요</span>':'<div style="width:46px"></div>'}
       <div style="flex:1">
-        <div class="notice-title">${n.title}${n.category?` <span class="chip" style="font-size:11px;margin-left:6px">${n.category}</span>`:''}</div>
+        <div class="notice-title">${n.title}${n.category?` <span class="chip" style="font-size:11px;margin-left:6px">${n.category}</span>`:''}${(n.date===todayStr&&!n.editDate)?'<span class="new-badge-notice">NEW</span>':''}</div>
         <div class="notice-content-preview">${n.content}</div>
         <div class="notice-meta">${n.date}${(n.time&&n.date===todayStr)?' '+n.time:''} · ${getUser(n.author).name} · ${getUser(n.author).pos}</div>
       </div>
