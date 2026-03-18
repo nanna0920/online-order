@@ -1649,6 +1649,7 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
       <div class="cal-editor-area" id="calEditorArea" contenteditable="true"></div>
     </div>
     <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end;padding:14px 20px;border-top:1px solid var(--border)">
+      <button class="btn btn-danger" id="calEditorDeleteBtn" onclick="calDeleteEditor()" style="display:none;margin-right:auto">🗑️ 삭제</button>
       <button class="btn btn-secondary" onclick="calCloseEditor()">취소</button>
       <button class="btn btn-primary" id="calEditorSaveBtn" onclick="calSaveEditor()">💾 저장</button>
     </div>
@@ -3821,6 +3822,10 @@ function calOpenEditor(type, ds, team) {
   // 에디터 영역에 기존 내용 세팅
   const area = document.getElementById('calEditorArea');
   area.innerHTML = existing ? existing.content : '';
+  area.contentEditable = 'true';
+  document.getElementById('calEditorSaveBtn').style.display = '';
+  document.getElementById('calEditorToolbar').style.display = '';
+  document.getElementById('calEditorDeleteBtn').style.display = (existing && existing.content) ? '' : 'none';
   area.focus();
 
   openModal('calEditorModal');
@@ -3838,6 +3843,7 @@ function calViewContent(type, ds, team) {
   document.getElementById('calEditorArea').contentEditable = 'false';
   document.getElementById('calEditorSaveBtn').style.display = 'none';
   document.getElementById('calEditorToolbar').style.display = 'none';
+  document.getElementById('calEditorDeleteBtn').style.display = 'none';
   openModal('calEditorModal');
 }
 
@@ -3846,6 +3852,7 @@ function calCloseEditor() {
   area.contentEditable = 'true';
   document.getElementById('calEditorSaveBtn').style.display = '';
   document.getElementById('calEditorToolbar').style.display = '';
+  document.getElementById('calEditorDeleteBtn').style.display = 'none';
   _calEditing = null;
   closeModal('calEditorModal');
 }
@@ -3957,8 +3964,30 @@ function calOpenSpecialEditor(type, monthPfx, team) {
   area.contentEditable = 'true';
   document.getElementById('calEditorSaveBtn').style.display = '';
   document.getElementById('calEditorToolbar').style.display = '';
+  document.getElementById('calEditorDeleteBtn').style.display = (existing && existing.content) ? '' : 'none';
   openModal('calEditorModal');
   setTimeout(() => area.focus(), 50);
+}
+
+function calDeleteEditor() {
+  if (!_calEditing) return;
+  if (!confirm('이 내용을 삭제하시겠습니까?')) return;
+  const { type, ds, team } = _calEditing;
+  const arr    = type === 'all' ? DB.memoAll : DB.memoTeam;
+  const sbType = type === 'all' ? 'memoAll' : 'memoTeam';
+  const existing = arr.find(m => m.date === ds && (type === 'all' || m.team === team));
+  if (existing) {
+    sbRemove(sbType, existing.id);
+    arr.splice(arr.indexOf(existing), 1);
+  }
+  calCloseEditor();
+  renderCal(type);
+  // 팀별 특이사항 삭제 시 기관 달력도 갱신
+  if (ds.endsWith('-00') && type === 'team') {
+    const allWrap = document.getElementById('calAllWrap');
+    if (allWrap) renderCal('all');
+  }
+  showToast('삭제되었습니다.', 'success');
 }
 
 function calEditorExec(cmd, val) {
