@@ -8298,19 +8298,17 @@ window.addEventListener('appinstalled', () => {
 
 // 설치 버튼/배너 표시 여부 초기화
 function _updatePwaUI() {
-  // 이미 설치된 경우 → 모두 숨김
+  // 이미 설치된 경우(standalone 모드) → 모두 숨김
   if (_isStandalone) { _hidePwaUI(); return; }
 
-  // 모바일이 아닌 경우 → 로그인 버튼 숨김 (배너만 데스크톱에서 표시 가능)
-  const loginInstall = document.getElementById('pwaLoginInstall');
-
-  if (_isIOS) {
-    // iOS: Safari에서만 설치 가능, 다른 앱(인앱브라우저 등) 제외
-    const isSafari = /safari/i.test(navigator.userAgent) && !/crios|fxios|opios/i.test(navigator.userAgent);
-    if (isSafari && loginInstall) loginInstall.style.display = 'block';
-  } else if (_pwaInstallPrompt) {
-    // Android/Chrome: beforeinstallprompt 이벤트 있을 때만 표시
+  // 모바일이면 브라우저 종류 상관없이 로그인 화면 설치 버튼 표시
+  if (_isMobile) {
+    const loginInstall = document.getElementById('pwaLoginInstall');
     if (loginInstall) loginInstall.style.display = 'block';
+  }
+
+  // beforeinstallprompt 이벤트가 있으면 하단 배너도 추가 표시
+  if (_pwaInstallPrompt) {
     const banner = document.getElementById('pwaInstallBanner');
     if (banner) banner.style.display = 'flex';
   }
@@ -8324,24 +8322,38 @@ function _hidePwaUI() {
   });
 }
 
-// 설치 버튼 클릭 처리 (Android / iOS 분기)
+// 설치 버튼 클릭 처리 (브라우저별 분기)
 function installPWA() {
   if (_isStandalone) return;
 
-  if (_isIOS) {
-    // iOS: 단계별 안내 모달 표시
-    const modal = document.getElementById('pwaIosModal');
-    if (modal) modal.style.display = 'block';
-    return;
-  }
-
-  // Android: 브라우저 기본 설치 프롬프트
+  // ① beforeinstallprompt 지원 브라우저 (Android Chrome/Edge/삼성 인터넷 등)
   if (_pwaInstallPrompt) {
     _pwaInstallPrompt.prompt();
     _pwaInstallPrompt.userChoice.then(choice => {
       _pwaInstallPrompt = null;
       if (choice.outcome === 'accepted') _hidePwaUI();
     });
+    return;
+  }
+
+  // ② iOS Safari → 단계별 안내 모달
+  if (_isIOS) {
+    const isSafari = /safari/i.test(navigator.userAgent) &&
+                     !/crios|fxios|opios|chrome/i.test(navigator.userAgent);
+    if (isSafari) {
+      const modal = document.getElementById('pwaIosModal');
+      if (modal) modal.style.display = 'block';
+    } else {
+      // iOS 인앱브라우저 (카카오톡, 네이버 등) → Safari로 유도
+      showToast('Safari 브라우저로 열어주세요: 공유(⎙) → 홈 화면에 추가', 'info');
+    }
+    return;
+  }
+
+  // ③ Android 인앱브라우저·Firefox 등 → Chrome/삼성 인터넷으로 유도
+  if (_isAndroid) {
+    showToast('Chrome 또는 삼성 인터넷 브라우저에서 열면 앱을 설치할 수 있어요', 'info');
+    return;
   }
 }
 
@@ -8355,10 +8367,9 @@ function closePwaIosModal() {
   if (modal) modal.style.display = 'none';
 }
 
-// 페이지 로드 후 설치 UI 초기화
+// 페이지 로드 후 설치 UI 초기화 (모든 모바일 브라우저)
 window.addEventListener('load', () => {
-  // iOS는 beforeinstallprompt가 없으므로 직접 초기화
-  if (_isIOS && !_isStandalone) _updatePwaUI();
+  if (!_isStandalone) _updatePwaUI();
 });
 
 // 모바일 사이드바 토글
