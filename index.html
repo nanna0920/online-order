@@ -340,6 +340,8 @@ canvas#sigCanvas { display:block; cursor:crosshair; touch-action:none; }
   z-index: 10;
 }
 #tplModalResizeHandle svg { opacity: .45; pointer-events: none; }
+#templateModal #tplModalBox .modal-header { cursor: move; user-select: none; }
+#templateModal #tplModalBox .modal-close  { cursor: pointer; }
 .modal-header { padding:20px 24px 16px; border-bottom:1px solid var(--border); display:flex;align-items:center;justify-content:space-between; }
 .modal-header h3 { font-size:16px; font-weight:700; color:var(--primary); }
 .modal-close { background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted);line-height:1; }
@@ -6470,10 +6472,17 @@ function closeModal(id) {
 }
 document.querySelectorAll('.modal-overlay').forEach(m=>{
   m.addEventListener('click',e=>{
+    // 서식 추가/수정 모달은 바깥 클릭으로 닫히지 않음
+    if(m.id==='templateModal') return;
     if(e.target===m && !window.getSelection()?.toString()) closeModal(m.id);
   });
 });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open')); });
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape') document.querySelectorAll('.modal-overlay.open').forEach(m=>{
+    if(m.id==='templateModal') return; // 서식 모달은 ESC로 닫히지 않음
+    m.classList.remove('open');
+  });
+});
 
 function escHtml(str) {
   return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/\n/g,'<br>');
@@ -7122,6 +7131,11 @@ function openTemplateModal(editId=null) {
     document.getElementById('templateDocType').value = '';
     document.getElementById('templateEditor').innerHTML = '';
   }
+  // 모달 위치/크기 초기화 (이전 드래그 상태 리셋)
+  const _tplBox = document.getElementById('tplModalBox');
+  const _tplOvl = document.getElementById('templateModal');
+  if (_tplBox) { _tplBox.style.position=''; _tplBox.style.left=''; _tplBox.style.top=''; _tplBox.style.margin=''; }
+  if (_tplOvl) { _tplOvl.style.alignItems=''; _tplOvl.style.justifyContent=''; }
   openModal('templateModal');
   setTimeout(() => {
     initTplEditorCheckbox();
@@ -8520,6 +8534,43 @@ function _syncMobileBadge() {
     approvalDst.style.display = approvalSrc.style.display;
   }
 }
+
+// ── 서식 모달 이동 (헤더 드래그) ────────────────────────────────────
+(function() {
+  let _md = null;
+  document.addEventListener('mousedown', function(e) {
+    const header = e.target.closest('#tplModalBox .modal-header');
+    if (!header || e.target.closest('.modal-close')) return;
+    e.preventDefault();
+    const modal   = document.getElementById('tplModalBox');
+    const overlay = document.getElementById('templateModal');
+    if (!modal || !overlay) return;
+    const r = modal.getBoundingClientRect();
+    // absolute 배치로 전환하여 자유 이동 가능하게 함
+    overlay.style.alignItems     = 'flex-start';
+    overlay.style.justifyContent = 'flex-start';
+    modal.style.position = 'absolute';
+    modal.style.margin   = '0';
+    modal.style.left     = r.left + 'px';
+    modal.style.top      = r.top  + 'px';
+    _md = { startX: e.clientX, startY: e.clientY, startLeft: r.left, startTop: r.top, modal, overlay };
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'move';
+  });
+  document.addEventListener('mousemove', function(e) {
+    if (!_md) return;
+    const newLeft = Math.max(0, Math.min(_md.startLeft + (e.clientX - _md.startX), window.innerWidth  - 100));
+    const newTop  = Math.max(0, Math.min(_md.startTop  + (e.clientY - _md.startY), window.innerHeight - 60));
+    _md.modal.style.left = newLeft + 'px';
+    _md.modal.style.top  = newTop  + 'px';
+  });
+  document.addEventListener('mouseup', function() {
+    if (!_md) return;
+    _md = null;
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+  });
+})();
 
 // ── 서식 모달 리사이즈 (우하단 핸들 드래그) ──────────────────────
 (function() {
