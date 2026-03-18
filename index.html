@@ -1986,6 +1986,7 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('templateModal')">취소</button>
+      <button class="btn btn-outline" onclick="previewEditingTemplate()">👁 미리보기</button>
       <button class="btn btn-primary" onclick="saveTemplate()">💾 저장</button>
     </div>
     <!-- 우하단 리사이즈 핸들 -->
@@ -2014,14 +2015,19 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
 </div>
 
 <!-- 서식 미리보기 모달 -->
-<div class="modal-overlay" id="tplPreviewModal" style="z-index:1400">
-  <div class="modal" style="max-width:760px;width:95vw">
+<div class="modal-overlay" id="tplPreviewModal" style="z-index:1500">
+  <div class="modal" style="max-width:1010px;width:96vw">
     <div class="modal-header">
       <h3 id="tplPreviewTitle">📄 서식 미리보기</h3>
       <button class="modal-close" onclick="closeModal('tplPreviewModal')">×</button>
     </div>
-    <div class="modal-body" style="padding:20px 24px;overflow-y:auto;max-height:65vh">
-      <div id="tplPreviewBody" style="font-size:14px;line-height:1.8"></div>
+    <div class="modal-body" style="padding:0;overflow-y:auto;max-height:75vh;background:#e0e0e0">
+      <div style="padding:20px;display:flex;justify-content:center">
+        <div id="tplPreviewBody"
+             style="width:210mm;min-height:297mm;padding:20mm 18mm;background:#fff;
+                    box-shadow:0 4px 20px rgba(0,0,0,.25);font-size:14px;line-height:1.8;
+                    font-family:'Noto Sans KR',sans-serif;box-sizing:content-box"></div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('tplPreviewModal')">닫기</button>
@@ -7237,6 +7243,24 @@ function previewTemplate(id) {
   document.getElementById('tplPreviewTitle').textContent = `📄 ${t.name}`;
   document.getElementById('tplPreviewBody').innerHTML = t.content;
   // 미리보기에서 적용 버튼 숨김 (서식관리 페이지에서 열린 경우)
+  document.getElementById('tplPreviewApplyBtn').style.display = 'none';
+  openModal('tplPreviewModal');
+}
+
+function previewEditingTemplate() {
+  const editorEl = document.getElementById('templateEditor');
+  const nameEl   = document.getElementById('templateName');
+  if (!editorEl) return;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = serializeEditorHTML(editorEl);
+  // contenteditable 제거 및 선택 클래스 정리
+  tmp.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+  tmp.querySelectorAll('.cell-merge-selected,.tpl-resize-hit').forEach(el => {
+    el.classList.remove('cell-merge-selected','tpl-resize-hit');
+  });
+  const title = (nameEl && nameEl.value.trim()) ? nameEl.value.trim() : '미리보기';
+  document.getElementById('tplPreviewTitle').textContent = `📄 ${title}`;
+  document.getElementById('tplPreviewBody').innerHTML = tmp.innerHTML;
   document.getElementById('tplPreviewApplyBtn').style.display = 'none';
   openModal('tplPreviewModal');
 }
