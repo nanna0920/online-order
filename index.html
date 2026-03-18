@@ -2126,6 +2126,7 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
 const SUPABASE_URL = 'https://dfmosmqnbowscamqswys.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmbW9zbXFuYm93c2NhbXFzd3lzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMDUzODAsImV4cCI6MjA4ODc4MTM4MH0.4KDdkdBeu75XzEGLcYGhykPEZSdLvf3kQShhu7Jjz6c';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const VAPID_PUBLIC_KEY = 'BEcChJ6OmICc8KrqpNUmqeCmsIgGg9d-raOO1bpYh-yDoe322UVgGfqxfxb9_qxWkRhs69yUZ7Ug8XxZEtDZFhU';
 
 // Supabase ID 생성 헬퍼
 function sbId(type, itemId) {
@@ -2473,6 +2474,72 @@ function sendDBNotif(userIds, notifData) {
     const row = { id, to: uid, ...notifData, sentAt: new Date().toISOString() };
     sbSave('notification', id, row);
   });
+  // 브라우저 종료 시에도 알림 수신: Web Push 발송
+  const icon = notifData.icon || '🔔';
+  const pushTitle = `${icon} ${notifData.kind || '알림'}`;
+  const pushBody = notifData.title + (notifData.sub ? '\n' + notifData.sub : '');
+  sendPushToUsers(userIds, pushTitle, pushBody);
+}
+
+// ============================================================
+// Web Push (백그라운드 알림 - 브라우저 종료 시에도 수신)
+// ============================================================
+function _urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const output = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) output[i] = rawData.charCodeAt(i);
+  return output;
+}
+
+async function subscribePush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  if (Notification.permission !== 'granted') return;
+  if (!currentUser) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: _urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+    const subId = 'push-' + currentUser.id;
+    await sb.from('e_approval').upsert({
+      id: subId,
+      type: 'push_subscription',
+      data: { userId: currentUser.id, subscription: sub.toJSON() },
+      updated_at: new Date().toISOString()
+    });
+  } catch(e) { console.warn('Push subscribe 오류:', e); }
+}
+
+async function sendPushToUsers(userIds, title, body) {
+  if (!userIds || !userIds.length) return;
+  try {
+    const { data: rows } = await sb.from('e_approval').select('*').eq('type', 'push_subscription');
+    if (!rows || !rows.length) return;
+    const targets = rows.filter(r => userIds.includes(r.data?.userId));
+    if (!targets.length) return;
+    const EDGE_URL = SUPABASE_URL + '/functions/v1/send-push';
+    await Promise.all(targets.map(async r => {
+      const sub = r.data?.subscription;
+      if (!sub) return;
+      try {
+        const res = await fetch(EDGE_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY },
+          body: JSON.stringify({ subscription: sub, title, body, url: './' })
+        });
+        if (res.status === 410) {
+          // 구독 만료 → DB에서 삭제
+          await sb.from('e_approval').delete().eq('id', r.id);
+        }
+      } catch(e) { /* 네트워크 오류 무시 */ }
+    }));
+  } catch(e) { console.warn('sendPushToUsers 오류:', e); }
 }
 
 // ============================================================
@@ -3062,6 +3129,8 @@ function _applyLogin(user, showWelcome) {
     initSeenIds();
     try { updateBadge(); } catch(e) {}
   });
+  // 알림 권한이 이미 허용된 경우 즉시 Web Push 구독
+  subscribePush();
 }
 
 async function doLogin() {
@@ -6423,8 +6492,12 @@ function onNotifPermBtnClick() {
   // default: 사용자 클릭(제스처)으로 권한 요청
   Notification.requestPermission().then(p => {
     updateNotifPermBtn();
-    if (p === 'granted') showToast('알림이 활성화되었습니다! 🔔 창 밖에서도 알림을 받습니다.', 'success');
-    else showToast('알림 권한이 거부되었습니다.', 'warning');
+    if (p === 'granted') {
+      showToast('알림이 활성화되었습니다! 🔔 앱이 꺼져있어도 알림을 받습니다.', 'success');
+      subscribePush();
+    } else {
+      showToast('알림 권한이 거부되었습니다.', 'warning');
+    }
   });
 }
 function showBrowserNotif(title, body) {
