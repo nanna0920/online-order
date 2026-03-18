@@ -7251,15 +7251,97 @@ function previewEditingTemplate() {
   const editorEl = document.getElementById('templateEditor');
   const nameEl   = document.getElementById('templateName');
   if (!editorEl) return;
+
+  // 에디터 내용 직렬화 및 편집 속성 정리
   const tmp = document.createElement('div');
   tmp.innerHTML = serializeEditorHTML(editorEl);
-  // contenteditable 제거 및 선택 클래스 정리
   tmp.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
   tmp.querySelectorAll('.cell-merge-selected,.tpl-resize-hit').forEach(el => {
     el.classList.remove('cell-merge-selected','tpl-resize-hit');
   });
-  const title = (nameEl && nameEl.value.trim()) ? nameEl.value.trim() : '미리보기';
-  document.getElementById('tplPreviewTitle').textContent = `📄 ${title}`;
+  // 테이블 너비 정규화 (프린트와 동일)
+  tmp.querySelectorAll('table').forEach(table => {
+    if (table.style.tableLayout === 'fixed') {
+      const firstRowCells = Array.from(
+        (table.querySelector('tr') || {querySelectorAll:()=>[]}).querySelectorAll('td, th')
+      );
+      const totalW = firstRowCells.reduce((s, c) => s + (parseFloat(c.style.width) || 0), 0);
+      if (totalW > 0) {
+        table.querySelectorAll('td, th').forEach(cell => {
+          const w = parseFloat(cell.style.width);
+          if (w > 0) cell.style.width = (w / totalW * 100).toFixed(3) + '%';
+        });
+      }
+    }
+    table.style.width = '100%';
+  });
+
+  // 제목+결재 테이블 구성 (프린트 미리보기와 동일한 레이아웃)
+  const tplName = (nameEl && nameEl.value.trim()) ? nameEl.value.trim() : '서식명';
+  const companyName = (DB.settings && DB.settings.companyName) || '';
+  const BS = 'border:1px solid #000;';
+  const COL_W = '3cm';
+  const SIG_IMG_H = '1.2cm';
+  // 샘플 결재자 2명 (기안자 포함)
+  const sampleApprovers = ['팀장', '부서장'];
+  const apPos  = sampleApprovers.map(pos =>
+    `<td style="${BS}text-align:center;font-size:15px;font-weight:700;width:${COL_W};padding:4px 2px;background:#cce8ff;color:#000">${pos}</td>`
+  ).join('');
+  const apName = sampleApprovers.map(() =>
+    `<td style="${BS}text-align:center;font-size:13px;font-weight:600;width:${COL_W};padding:4px 2px;background:#fffde0;color:#000">&nbsp;</td>`
+  ).join('');
+  const apSig  = sampleApprovers.map(() =>
+    `<td style="${BS}text-align:center;width:${COL_W};vertical-align:middle;padding:3px 2px;height:${SIG_IMG_H}"><div style="color:#aaa;font-size:10px;text-align:center">서명</div></td>`
+  ).join('');
+
+  const combinedHtml = `<table style="width:100%;border-collapse:collapse;margin-bottom:12px;table-layout:fixed">
+    <colgroup>
+      <col>
+      <col style="width:1cm">
+      <col style="width:${COL_W}">
+      ${sampleApprovers.map(() => `<col style="width:${COL_W}">`).join('')}
+    </colgroup>
+    <tr>
+      <td rowspan="3" style="${BS}text-align:center;font-size:40px;font-weight:700;letter-spacing:3px;padding:14px 20px;vertical-align:middle;color:#000">${tplName}</td>
+      <td rowspan="3" style="${BS}vertical-align:middle;text-align:center;font-size:15px;font-weight:700;padding:4px 2px;background:#cce8ff;color:#000;line-height:1.8;letter-spacing:2px">결<br>재</td>
+      <td style="${BS}text-align:center;font-size:15px;font-weight:700;width:${COL_W};padding:4px 2px;background:#cce8ff;color:#000">기안자</td>
+      ${apPos}
+    </tr>
+    <tr>
+      <td style="${BS}text-align:center;font-size:13px;font-weight:600;width:${COL_W};padding:4px 2px;background:#fffde0;color:#000">&nbsp;</td>
+      ${apName}
+    </tr>
+    <tr>
+      <td style="${BS}text-align:center;width:${COL_W};vertical-align:middle;padding:3px 2px;height:${SIG_IMG_H}"><div style="color:#aaa;font-size:10px;text-align:center">서명</div></td>
+      ${apSig}
+    </tr>
+  </table>`;
+
+  // form-title이 있으면 교체, 없으면 맨 앞에 삽입
+  const formTitle = tmp.querySelector('.form-title');
+  if (formTitle) {
+    formTitle.outerHTML = combinedHtml;
+  } else {
+    tmp.insertAdjacentHTML('afterbegin', combinedHtml);
+  }
+
+  // 날짜·회사명 삽입 ("위와 같이" 문구가 있는 경우)
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}년 ${String(today.getMonth()+1).padStart(2,'0')}월 ${String(today.getDate()).padStart(2,'0')}일`;
+  tmp.querySelectorAll('p').forEach(p => {
+    if (!p.textContent.includes('위와 같이')) return;
+    p.style.fontSize  = '20px';
+    p.style.textAlign = 'center';
+    const after = document.createElement('div');
+    after.style.cssText = 'text-align:center;color:#000;line-height:1.8';
+    after.innerHTML = `<br><br><br>
+      <span style="font-size:20px">${dateStr}</span>
+      <br><br><br>
+      <span style="font-size:25px;font-weight:700;letter-spacing:4px">${companyName}장 귀하</span>`;
+    p.insertAdjacentElement('afterend', after);
+  });
+
+  document.getElementById('tplPreviewTitle').textContent = `📄 ${tplName}`;
   document.getElementById('tplPreviewBody').innerHTML = tmp.innerHTML;
   document.getElementById('tplPreviewApplyBtn').style.display = 'none';
   openModal('tplPreviewModal');
