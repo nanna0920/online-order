@@ -2027,6 +2027,22 @@ async function sbRemove(type, itemId) {
   broadcastChange(rid, type); // 삭제 완료 후 broadcast (다른 사용자 즉시 반영)
 }
 
+// 로그인 인증용: 사용자 데이터만 빠르게 로드
+async function loadUsersOnly() {
+  try {
+    const { data, error } = await sb.from('e_approval').select('*').eq('type', 'users');
+    if (error) throw error;
+    if (data && data.length > 0) {
+      DB.users = data.map(r => r.data);
+      return DB.users.length > 0;
+    }
+    return DB.users.length > 0;
+  } catch(e) {
+    console.error('사용자 로드 오류:', e);
+    return false;
+  }
+}
+
 // Supabase에서 전체 데이터 로드
 async function loadFromSupabase() {
   try {
@@ -2865,7 +2881,7 @@ async function doLogin() {
   if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = '⏳ 로딩 중...'; }
   let loadOk = false;
   try {
-    loadOk = await loadFromSupabase();
+    loadOk = await loadUsersOnly();
   } catch(e) { loadOk = false; }
   if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = '🔐 로그인'; }
   if (!loadOk || DB.users.length === 0) {
