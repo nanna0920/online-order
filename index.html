@@ -3290,14 +3290,7 @@ async function doLogin() {
     showToast('아이디 또는 비밀번호가 잘못되었습니다.', 'error');
     return;
   }
-  // 인증 성공 → 백그라운드 프리로드 완료 대기 (이미 완료됐으면 즉시 진행)
-  if (_preloadPromise && !_dataPreloaded) {
-    try { await _preloadPromise; } catch(e) {}
-  }
-  // 프리로드 실패한 경우에만 직접 로드
-  if (!_dataPreloaded) {
-    try { await loadFromSupabase(); _dataPreloaded = true; } catch(e) { _dataPreloaded = false; }
-  }
+  // 인증 성공 → 즉시 앱 진입, 데이터는 startPolling()이 백그라운드 로드
   if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = '🔐 로그인'; }
   _applyLogin(user, true);
 }
@@ -7205,11 +7198,7 @@ window.addEventListener('load', async ()=>{
     if (raw) {
       const saved = JSON.parse(raw);
       if (saved && saved.id && saved.active !== false) {
-        // 자동 로그인: 전체 데이터 미리 로드 후 앱 진입 (로그인 버튼 로딩 표시)
-        const _autoBtn = document.getElementById('loginBtn');
-        if (_autoBtn) { _autoBtn.disabled = true; _autoBtn.textContent = '⏳ 데이터 로딩 중...'; }
-        try { await loadFromSupabase(); _dataPreloaded = true; } catch(e) { _dataPreloaded = false; }
-        if (_autoBtn) { _autoBtn.disabled = false; _autoBtn.textContent = '🔐 로그인'; }
+        // 자동 로그인: 즉시 앱 진입, 데이터는 startPolling()이 백그라운드 로드
         _applyLogin(saved, false);
         return;
       }
