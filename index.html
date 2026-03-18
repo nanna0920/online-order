@@ -6004,19 +6004,52 @@ let _memberSearchQ = '';
 function loadMembers() { _memberSearchQ = ''; renderMembers(''); }
 function searchMembers(q) { _memberSearchQ = q; renderMembers(q); }
 
-// 메뉴 단일 활성/비활성 즉시 토글 (읽기+쓰기 동시 전환)
+// 메뉴 활성/비활성 토글
 function toggleMenuActive(uid, key) {
   const u = getUser(uid);
   if (!u) return;
   const perms = getMenuPermsObj(u);
   const isActive = !!(perms[key]?.r || perms[key]?.w);
-  perms[key] = isActive ? {r:false, w:false} : {r:true, w:true};
+  if (isActive) {
+    perms[key] = { r:false, w:false, d:false }; // 비활성 시 전체 초기화
+  } else {
+    perms[key] = { r:true, w: perms[key]?.w||false, d: perms[key]?.d||false }; // 활성 시 기존 w/d 유지
+  }
   u.menuPerms = perms;
   u.menus = MENU_PERMS.map(m => m.key).filter(k => perms[k]?.r || perms[k]?.w);
   sbSave('users', uid, u);
   renderMembers(_memberSearchQ);
   const label = MENU_PERMS.find(m => m.key === key)?.label || key;
   showToast(`${u.name}님의 [${label}] 메뉴가 ${isActive ? '비활성화' : '활성화'}되었습니다.`, isActive ? 'warning' : 'success');
+}
+// 메뉴 쓰기 권한 토글 (쓰기 끄면 삭제도 끄기)
+function toggleMenuWrite(uid, key) {
+  const u = getUser(uid);
+  if (!u) return;
+  const perms = getMenuPermsObj(u);
+  if (!perms[key]?.r) return;
+  const hasW = !!perms[key].w;
+  perms[key] = { ...perms[key], w: !hasW, d: hasW ? false : perms[key]?.d||false };
+  u.menuPerms = perms;
+  u.menus = MENU_PERMS.map(m => m.key).filter(k => perms[k]?.r || perms[k]?.w);
+  sbSave('users', uid, u);
+  renderMembers(_memberSearchQ);
+  const label = MENU_PERMS.find(m => m.key === key)?.label || key;
+  showToast(`${u.name}님의 [${label}] 쓰기 권한이 ${hasW ? '해제' : '설정'}되었습니다.`, 'success');
+}
+// 메뉴 삭제 권한 토글
+function toggleMenuDelete(uid, key) {
+  const u = getUser(uid);
+  if (!u) return;
+  const perms = getMenuPermsObj(u);
+  if (!perms[key]?.r || !perms[key]?.w) return;
+  const hasD = !!perms[key].d;
+  perms[key] = { ...perms[key], d: !hasD };
+  u.menuPerms = perms;
+  sbSave('users', uid, u);
+  renderMembers(_memberSearchQ);
+  const label = MENU_PERMS.find(m => m.key === key)?.label || key;
+  showToast(`${u.name}님의 [${label}] 삭제 권한이 ${hasD ? '해제' : '설정'}되었습니다.`, 'success');
 }
 
 function renderMembers(q) {
@@ -6032,21 +6065,48 @@ function renderMembers(q) {
       menuPermCell = `<span style="font-size:12px;color:var(--text-sub);font-style:italic">관리자 (전체 허용)</span>`;
     } else {
       const perms = getMenuPermsObj(u);
+      const canToggle = _curIsAdmin; // 관리자만 직접 토글 가능
       const rows = MENU_PERMS.map(m => {
         const isActive = !!(perms[m.key]?.r || perms[m.key]?.w);
-        const w = perms[m.key]?.w;
-        const activeBadge = isActive
-          ? `<span style="font-size:10px;background:#fff3e0;color:#b85c00;padding:1px 6px;border-radius:8px;font-weight:700">활성</span>`
-          : `<span style="font-size:10px;background:#f0f0f0;color:#bbb;padding:1px 6px;border-radius:8px">비활성</span>`;
-        const wBadge = w
-          ? `<span style="font-size:10px;background:#eef4ff;color:#1a5cb0;padding:1px 6px;border-radius:8px;font-weight:600">쓰기</span>`
-          : `<span style="font-size:10px;background:#f0f0f0;color:#ccc;padding:1px 5px;border-radius:8px">쓰기</span>`;
-        return `<div style="display:flex;align-items:center;gap:4px;padding:2px 0;opacity:${isActive?'1':'0.5'}">
-          <span style="font-size:11px;min-width:80px;color:${isActive?'var(--text-main)':'#aaa'}">${m.icon} ${m.label}</span>
-          ${activeBadge}${wBadge}
+        const w = !!perms[m.key]?.w;
+        const d = !!perms[m.key]?.d;
+
+        // 활성화 버튼
+        const activeStyle = isActive
+          ? `background:#fff3e0;color:#b85c00;border:1px solid #f5bc6e;font-weight:700;`
+          : `background:#f0f0f0;color:#bbb;border:1px solid #e0e0e0;`;
+        const activeEl = canToggle
+          ? `<span onclick="toggleMenuActive('${u.id}','${m.key}')" title="${isActive?'클릭하여 비활성화':'클릭하여 활성화'}"
+               style="font-size:10px;padding:2px 7px;border-radius:8px;cursor:pointer;user-select:none;${activeStyle}">${isActive?'활성':'비활성'}</span>`
+          : `<span style="font-size:10px;padding:2px 7px;border-radius:8px;${activeStyle}">${isActive?'활성':'비활성'}</span>`;
+
+        // 쓰기 버튼
+        const wStyle = w
+          ? `background:#eef4ff;color:#1a5cb0;border:1px solid #b3c9f0;font-weight:600;`
+          : `background:#f0f0f0;color:#ccc;border:1px solid #e0e0e0;`;
+        const wEl = (canToggle && isActive)
+          ? `<span onclick="toggleMenuWrite('${u.id}','${m.key}')" title="${w?'쓰기 권한 해제':'쓰기 권한 부여'}"
+               style="font-size:10px;padding:2px 7px;border-radius:8px;cursor:pointer;user-select:none;${wStyle}">쓰기</span>`
+          : `<span style="font-size:10px;padding:2px 7px;border-radius:8px;opacity:${isActive?'1':'0.45'};${wStyle}">쓰기</span>`;
+
+        // 삭제 버튼 (hasDel 메뉴만)
+        let dEl = '';
+        if (m.hasDel) {
+          const dStyle = d
+            ? `background:#fff0f0;color:#c0392b;border:1px solid #f0b3b3;font-weight:600;`
+            : `background:#f0f0f0;color:#ccc;border:1px solid #e0e0e0;`;
+          dEl = (canToggle && isActive && w)
+            ? `<span onclick="toggleMenuDelete('${u.id}','${m.key}')" title="${d?'삭제 권한 해제':'삭제 권한 부여'}"
+                 style="font-size:10px;padding:2px 7px;border-radius:8px;cursor:pointer;user-select:none;${dStyle}">삭제</span>`
+            : `<span style="font-size:10px;padding:2px 7px;border-radius:8px;opacity:${(isActive&&w)?'1':'0.35'};${dStyle}">삭제</span>`;
+        }
+
+        return `<div style="display:flex;align-items:center;gap:4px;padding:2px 0;opacity:${isActive?'1':'0.55'}">
+          <span style="font-size:11px;min-width:84px;color:${isActive?'var(--text-main)':'#aaa'}">${m.icon} ${m.label}</span>
+          ${activeEl}${wEl}${dEl}
         </div>`;
       }).join('');
-      menuPermCell = `<div style="display:flex;flex-direction:column;gap:2px">${rows}</div>`;
+      menuPermCell = `<div style="display:flex;flex-direction:column;gap:3px">${rows}</div>`;
     }
     return `
     <tr>
