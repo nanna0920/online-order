@@ -1938,7 +1938,7 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
             </div>
           </div>
           <div class="editor-divider"></div>
-          <span class="tbl-label" style="font-size:10px;color:var(--text-muted)">Tab: 다음 셀 &nbsp;|&nbsp; Shift+Enter: 다음 셀</span>
+          <span class="tbl-label" style="font-size:10px;color:var(--text-muted)">Tab: 다음 셀 &nbsp;|&nbsp; 셀 경계 드래그: 열/행 크기 조절</span>
         </div>
         <div id="templateEditor"
              class="doc-editor-area"
@@ -8093,6 +8093,8 @@ function tplTableDeleteCol() {
 }
 
 let _tplTableEditingInited = false;
+let _tplResizing = null; // 열/행 크기 조절 드래그 상태
+
 function initTplTableEditing() {
   // 툴바 mousedown → 포커스 빼앗기 방지 (한 번만)
   const tb = document.getElementById('tplTableToolbar');
@@ -8101,23 +8103,88 @@ function initTplTableEditing() {
     tb.addEventListener('mousedown', function(e) { e.preventDefault(); });
   }
 
+  // 에디터 mousemove → 커서 힌트 (col-resize / row-resize)
+  const _editor0 = document.getElementById('templateEditor');
+  if (_editor0 && !_editor0._resizeCursorInited) {
+    _editor0._resizeCursorInited = true;
+    _editor0.addEventListener('mousemove', function(e) {
+      if (_tplResizing) return;
+      let el = e.target;
+      while (el && el !== _editor0) {
+        if (el.tagName === 'TD' || el.tagName === 'TH') break;
+        el = el.parentElement;
+      }
+      if (!el || (el.tagName !== 'TD' && el.tagName !== 'TH') || !_editor0.contains(el)) {
+        _editor0.style.cursor = ''; return;
+      }
+      const rect = el.getBoundingClientRect();
+      const rx = e.clientX - rect.left, ry = e.clientY - rect.top;
+      const THRESH = 6;
+      if (rect.width - rx <= THRESH && rx >= 0)   { _editor0.style.cursor = 'col-resize'; return; }
+      if (rect.height - ry <= THRESH && ry >= 0)  { _editor0.style.cursor = 'row-resize'; return; }
+      _editor0.style.cursor = '';
+    });
+  }
+
   if (_tplTableEditingInited) return;
   _tplTableEditingInited = true;
 
-  // document 레벨 mousedown (capture) → 템플릿 에디터 안 셀 클릭 + 드래그 합병 선택
+  // 열/행 리사이즈 히트 감지 헬퍼
+  function _getResizeHit(e) {
+    const editor = document.getElementById('templateEditor');
+    if (!editor) return null;
+    let el = e.target;
+    while (el && el !== editor) {
+      if (el.tagName === 'TD' || el.tagName === 'TH') break;
+      el = el.parentElement;
+    }
+    if (!el || (el.tagName !== 'TD' && el.tagName !== 'TH') || !editor.contains(el)) return null;
+    const rect = el.getBoundingClientRect();
+    const rx = e.clientX - rect.left, ry = e.clientY - rect.top;
+    const THRESH = 6;
+    if (rect.width - rx <= THRESH && rx >= 0)  return { type: 'col', cell: el };
+    if (rect.height - ry <= THRESH && ry >= 0) return { type: 'row', cell: el };
+    return null;
+  }
+
+  // document 레벨 mousedown (capture) → 리사이즈 우선 감지, 이후 합병 선택
   document.addEventListener('mousedown', function(e) {
     const editor = document.getElementById('templateEditor');
     if (!editor) return;
     const tb = document.getElementById('tplTableToolbar');
     if (tb && tb.contains(e.target)) return;
 
+    // ── 열/행 리사이즈 감지 (셀 경계 클릭) ────────────────────
+    const hit = _getResizeHit(e);
+    if (hit) {
+      e.preventDefault();
+      const cell = hit.cell;
+      const table = cell.closest('table');
+      if (!table) return;
+      if (hit.type === 'col') {
+        // table-layout: fixed 강제 → 현재 각 열 너비 고정
+        table.style.tableLayout = 'fixed';
+        table.style.width = table.getBoundingClientRect().width + 'px';
+        Array.from(table.rows).forEach(row => {
+          Array.from(row.cells).forEach(c => { c.style.width = c.getBoundingClientRect().width + 'px'; });
+        });
+        const colIdx = cell.cellIndex;
+        const colCells = Array.from(table.rows).map(r => r.cells[colIdx]).filter(Boolean);
+        _tplResizing = { type: 'col', startX: e.clientX, startSize: cell.getBoundingClientRect().width, cells: colCells };
+      } else {
+        const row = cell.closest('tr');
+        _tplResizing = { type: 'row', startY: e.clientY, startSize: cell.getBoundingClientRect().height, cells: Array.from(row.cells) };
+      }
+      return; // 합병 선택 진입 방지
+    }
+
+    // ── 셀 클릭 → 합병 선택 시작 ─────────────────────────────
     const cell = e.target.closest('td, th');
     if (cell && editor.contains(cell)) {
       if (!cell.hasAttribute('contenteditable')) cell.setAttribute('contenteditable', 'true');
       if (!cell.hasAttribute('tabindex')) cell.setAttribute('tabindex', '0');
       _tplActiveCell = cell;
       tplUpdateTableToolbar();
-      // 드래그 합병 선택 시작
       clearMergeSel('tpl');
       _mergeSel.tpl.start = cell;
       _mergeSel.tpl.table = cell.closest('table');
@@ -8138,8 +8205,20 @@ function initTplTableEditing() {
     }
   }, true);
 
-  // 드래그 중 셀 선택 확장
+  // 드래그 중 → 리사이즈 반영 또는 셀 선택 확장
   document.addEventListener('mousemove', function(e) {
+    if (_tplResizing) {
+      if (_tplResizing.type === 'col') {
+        const dx = e.clientX - _tplResizing.startX;
+        const newW = Math.max(30, _tplResizing.startSize + dx);
+        _tplResizing.cells.forEach(c => { c.style.width = newW + 'px'; });
+      } else {
+        const dy = e.clientY - _tplResizing.startY;
+        const newH = Math.max(18, _tplResizing.startSize + dy);
+        _tplResizing.cells.forEach(c => { c.style.height = newH + 'px'; });
+      }
+      return;
+    }
     if (!_mergeSel.tpl.dragging) return;
     const editor = document.getElementById('templateEditor');
     if (!editor) return;
@@ -8151,6 +8230,12 @@ function initTplTableEditing() {
 
   // 드래그 종료
   document.addEventListener('mouseup', function() {
+    if (_tplResizing) {
+      _tplResizing = null;
+      const editor = document.getElementById('templateEditor');
+      if (editor) editor.style.cursor = '';
+      return;
+    }
     if (_mergeSel.tpl.dragging) {
       _mergeSel.tpl.dragging = false;
       updateMergeBtns('tpl');
