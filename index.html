@@ -2944,7 +2944,22 @@ async function fullSyncSupabase() {
       return merged;
     };
     DB.docs    = toArr('docs');      // 전체 조회 기준 → 삭제 시 빈 배열로 교체
-    if (byType.users)      DB.users   = toArrMerge('users'); // 로컬 pending 변경 보호
+    if (byType.users) {
+      DB.users = toArrMerge('users'); // 로컬 pending 변경 보호
+      // currentUser를 Supabase 최신 데이터로 동기화 (F5 후 stale 데이터 방지)
+      if (currentUser) {
+        const fresh = DB.users.find(u => u.id === currentUser.id);
+        if (fresh) {
+          if (fresh.active === false) { doLogout(); return; } // 비활성화된 경우 강제 로그아웃
+          Object.assign(currentUser, fresh);
+          // localStorage 세션도 최신 데이터로 갱신
+          try {
+            const { pw: _pw, ...toStore } = currentUser;
+            localStorage.setItem('e_approval_session', JSON.stringify(toStore));
+          } catch(e) {}
+        }
+      }
+    }
     DB.notices = toArr('notices');   // 전체 조회 기준 → 삭제 시 빈 배열로 교체
     DB.lines = toArr('lines').map(l => {
       // 구 형식(docTypes 없음): docType 문자열 → 배열 변환
@@ -7003,11 +7018,11 @@ window.addEventListener('load', async ()=>{
     const raw = localStorage.getItem('e_approval_session');
     if (raw) {
       const saved = JSON.parse(raw);
-      if (saved && saved.id && saved.active) {
+      if (saved && saved.id && saved.active !== false) {
         _applyLogin(saved, false); // 즉시 로그인 - startPolling()이 내부에서 전체 데이터 로드
         return;
       }
-      localStorage.removeItem('e_approval_session'); // 유효하지 않은 세션 정리
+      localStorage.removeItem('e_approval_session'); // 비활성화된 계정 세션 정리
     }
   } catch(e) { localStorage.removeItem('e_approval_session'); }
 
