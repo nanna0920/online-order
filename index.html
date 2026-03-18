@@ -3024,6 +3024,42 @@ function generateDocId(dept, year) {
 // ============================================================
 // AUTH
 // ============================================================
+
+// 로그인 후 UI 적용 공통 함수 (doLogin / 자동 로그인 공용)
+function _applyLogin(user, showWelcome) {
+  localStorage.setItem('e_approval_uid', user.id); // 세션 유지
+  currentUser = user;
+  document.getElementById('loginPage').style.display = 'none';
+  document.getElementById('appPage').style.display = 'flex';
+  document.getElementById('sideUserName').textContent = user.name;
+  document.getElementById('sideUserRole').textContent = `${user.dept} · ${user.pos}`;
+  const _sideAv = document.getElementById('sideAvatar');
+  if (_sideAv && user.photo) _sideAv.innerHTML = `<img src="${user.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+  document.getElementById('docWriter').textContent = `${user.name} (${user.pos})`;
+  document.getElementById('docDept').textContent = user.dept;
+  document.getElementById('docDate').textContent = new Date().toLocaleDateString('ko-KR');
+  const _isAdmin = isAdmin(user);
+  document.querySelectorAll('.admin-only').forEach(el => {
+    el.style.display = _isAdmin ? '' : 'none';
+  });
+  applyMenuPerms(user);
+  loadSettings();
+  _lastSyncTime = '';
+  _pollLastIds  = new Set();
+  _localChanges.clear();
+  clearTabFlash(); _origTitle = document.title;
+  requestBrowserNotifPermission();
+  _requestWakeLock();
+  _loginTs = Date.now();
+  initRealtime();
+  showPage('dashboard', null);
+  if (showWelcome) showToast(`${user.name}님, 환영합니다! 👋`, 'success');
+  startPolling().then(() => {
+    initSeenIds();
+    try { updateBadge(); } catch(e) {}
+  });
+}
+
 async function doLogin() {
   const id = document.getElementById('loginId').value.trim();
   const pw = document.getElementById('loginPw').value.trim();
@@ -3040,45 +3076,11 @@ async function doLogin() {
   }
   const user = DB.users.find(u => u.id === id && u.pw === pw && u.active);
   if (!user) { showToast('아이디 또는 비밀번호가 잘못되었습니다.', 'error'); return; }
-  currentUser = user;
-  document.getElementById('loginPage').style.display = 'none';
-  document.getElementById('appPage').style.display = 'flex';
-  document.getElementById('sideUserName').textContent = user.name;
-  document.getElementById('sideUserRole').textContent = `${user.dept} · ${user.pos}`;
-  const _sideAv = document.getElementById('sideAvatar');
-  if (_sideAv && user.photo) _sideAv.innerHTML = `<img src="${user.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
-  document.getElementById('docWriter').textContent = `${user.name} (${user.pos})`;
-  document.getElementById('docDept').textContent = user.dept;
-  document.getElementById('docDate').textContent = new Date().toLocaleDateString('ko-KR');
-  // 관리자 전용 항목 표시 제어
-  const _isAdmin = isAdmin(user);
-  document.querySelectorAll('.admin-only').forEach(el => {
-    el.style.display = _isAdmin ? '' : 'none';
-  });
-  // 메뉴 권한 적용 (user.menus 기반) - noticeWriteBtn 표시 여부는 applyMenuPerms/loadNotice가 처리
-  applyMenuPerms(user);
-  loadSettings();
-  _lastSyncTime = '';      // 이전 세션 타임스탬프 초기화
-  _pollLastIds  = new Set(); // 이전 세션 폴 캐시 초기화
-  _localChanges.clear();   // 이전 세션 로컬 변경 캐시 초기화
-  clearTabFlash(); _origTitle = document.title; // 탭 제목 초기화
-  requestBrowserNotifPermission(); // 브라우저 알림 권한 요청
-  _requestWakeLock();              // Chrome 백그라운드 탭 동결 방지 (Intensive Throttling 차단)
-  _loginTs = Date.now();           // 로그인 시각 기록 (ms 단위 - 이전 항목 알림 방지)
-  initRealtime();
-
-  // 즉시 화면 전환 (데이터 동기화를 기다리지 않음)
-  showPage('dashboard', null);
-  showToast(`${user.name}님, 환영합니다! 👋`, 'success');
-
-  // 전체 데이터 동기화는 백그라운드에서 진행
-  startPolling().then(() => {
-    initSeenIds();   // 첫 동기화 완료 후 기존 항목 ID 기록 (이후 새 항목만 알림)
-    try { updateBadge(); } catch(e) {}
-  });
+  _applyLogin(user, true);
 }
 
 function doLogout() {
+  localStorage.removeItem('e_approval_uid'); // 세션 삭제
   if (_realtimeRetryTimer) { clearTimeout(_realtimeRetryTimer); _realtimeRetryTimer = null; }
   if (_realtimeChannel) { sb.removeChannel(_realtimeChannel); _realtimeChannel = null; }
   _realtimeConnecting = false;
@@ -6665,7 +6667,7 @@ function showToast(msg, type='info') {
 // ============================================================
 window.addEventListener('load', async ()=>{
   renderLoginCompanyInfo();
-  // 회사 설정 + 사용자 목록을 동시에 미리 로드 (로그인 버튼 클릭 시 즉시 인증 가능하도록)
+  // 회사 설정 + 사용자 목록을 동시에 미리 로드
   try {
     const [settingsRes, usersRes] = await Promise.all([
       sb.from('e_approval').select('*').eq('type','settings'),
@@ -6674,6 +6676,13 @@ window.addEventListener('load', async ()=>{
     if (settingsRes.data?.length) { DB.settings = settingsRes.data[0].data; renderLoginCompanyInfo(); }
     if (usersRes.data?.length)    { DB.users = usersRes.data.map(r => r.data); }
   } catch(e) {}
+  // 자동 로그인: 이전 세션 복원 (로그아웃 전까지 유지)
+  const savedUid = localStorage.getItem('e_approval_uid');
+  if (savedUid && DB.users.length > 0) {
+    const savedUser = DB.users.find(u => u.id === savedUid && u.active);
+    if (savedUser) { _applyLogin(savedUser, false); return; }
+    else { localStorage.removeItem('e_approval_uid'); } // 비활성/삭제 계정 정리
+  }
   // Enter key login
   document.getElementById('loginPw').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
   // 알림 버튼 초기 상태 반영
