@@ -3424,13 +3424,9 @@ function updateBadge() {
   try { _syncMobileBadge(); } catch(e) {}
 
   // 앱 아이콘 뱃지 (PWA 홈 화면 바로가기 아이콘 - Android/iOS)
-  // 읽지 않은 결재 대기 문서 수를 표시, 읽으면 즉시 감소
-  const unreadPendingCnt = myApprDocs.filter(d =>
-    d.approvers?.some(a => a?.id === currentUser.id && a?.status === 'pending') &&
-    !_readDocIds.has(String(d.id))
-  ).length;
+  // 결재 대기 건수를 표시 → 결재(승인/반려)하면 즉시 감소, 모두 결재하면 사라짐
   if ('setAppBadge' in navigator) {
-    if (unreadPendingCnt > 0) navigator.setAppBadge(unreadPendingCnt).catch(() => {});
+    if (pendingCnt > 0) navigator.setAppBadge(pendingCnt).catch(() => {});
     else navigator.clearAppBadge().catch(() => {});
   }
 }
