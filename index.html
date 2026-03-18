@@ -313,13 +313,15 @@ canvas#sigCanvas { display:block; cursor:crosshair; touch-action:none; }
 .modal-overlay.open .modal { transform:translateY(0); }
 /* 서식 추가/수정 모달 리사이즈 */
 #templateModal .modal {
-  resize: both;
+  position: relative;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  width: min(900px, 92vw);
+  height: 80vh;
   min-width: 640px;
   min-height: 500px;
-  max-height: 94vh;
+  max-height: none;
   max-width: none;
   box-sizing: border-box;
 }
@@ -328,6 +330,16 @@ canvas#sigCanvas { display:block; cursor:crosshair; touch-action:none; }
   overflow-y: auto;
   min-height: 0;
 }
+#tplModalResizeHandle {
+  position: absolute;
+  bottom: 0; right: 0;
+  width: 22px; height: 22px;
+  cursor: se-resize;
+  display: flex; align-items: flex-end; justify-content: flex-end;
+  padding: 3px;
+  z-index: 10;
+}
+#tplModalResizeHandle svg { opacity: .45; pointer-events: none; }
 .modal-header { padding:20px 24px 16px; border-bottom:1px solid var(--border); display:flex;align-items:center;justify-content:space-between; }
 .modal-header h3 { font-size:16px; font-weight:700; color:var(--primary); }
 .modal-close { background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted);line-height:1; }
@@ -1847,7 +1859,7 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
 
 <!-- 서식 편집 모달 -->
 <div class="modal-overlay" id="templateModal" style="z-index:1200">
-  <div class="modal" style="width:96vw">
+  <div class="modal" id="tplModalBox">
     <div class="modal-header">
       <h3 id="templateModalTitle">📋 서식 추가</h3>
       <button class="modal-close" onclick="closeModal('templateModal')">×</button>
@@ -1973,6 +1985,12 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('templateModal')">취소</button>
       <button class="btn btn-primary" onclick="saveTemplate()">💾 저장</button>
+    </div>
+    <!-- 우하단 리사이즈 핸들 -->
+    <div id="tplModalResizeHandle" title="드래그하여 창 크기 조절">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M13 1L1 13M13 5L5 13M13 9L9 13" stroke="#555" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
     </div>
   </div>
 </div>
@@ -8503,6 +8521,33 @@ function _syncMobileBadge() {
   }
 }
 
+// ── 서식 모달 리사이즈 (우하단 핸들 드래그) ──────────────────────
+(function() {
+  let _rd = null; // { startX, startY, startW, startH, modal }
+  document.addEventListener('mousedown', function(e) {
+    if (!e.target.closest('#tplModalResizeHandle')) return;
+    e.preventDefault();
+    const modal = document.getElementById('tplModalBox');
+    if (!modal) return;
+    const r = modal.getBoundingClientRect();
+    _rd = { startX: e.clientX, startY: e.clientY, startW: r.width, startH: r.height, modal };
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'se-resize';
+  });
+  document.addEventListener('mousemove', function(e) {
+    if (!_rd) return;
+    const newW = Math.max(640, _rd.startW + (e.clientX - _rd.startX));
+    const newH = Math.max(500, _rd.startH + (e.clientY - _rd.startY));
+    _rd.modal.style.width  = newW + 'px';
+    _rd.modal.style.height = newH + 'px';
+  });
+  document.addEventListener('mouseup', function() {
+    if (!_rd) return;
+    _rd = null;
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+  });
+})();
 
 </script>
 
