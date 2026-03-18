@@ -3443,12 +3443,16 @@ function updateBadge() {
   const myApprDocs = DB.docs.filter(d => d && !d.draft && d.approvers?.some(a => a?.id === currentUser.id));
   const pendingCnt = myApprDocs.filter(d => d.approvers?.some(a => a?.id === currentUser.id && a?.status === 'pending')).length;
   const doneCnt    = myApprDocs.filter(d => d.approvers?.some(a => a?.id === currentUser.id && (a?.status === 'approved' || a?.status === 'rejected'))).length;
-  const totalApprovalCnt = myApprDocs.length;
 
+  // 결재함 미확인: 내가 결재해야 할 대기 중인 건수 (읽지 않은 것)
+  const approvalUnread = myApprDocs.filter(d =>
+    d.approvers?.some(a => a?.id === currentUser.id && a?.status === 'pending') &&
+    !_readDocIds.has(String(d.id))
+  ).length;
   const approvalBadgeEl = document.getElementById('approvalBadge');
   if (approvalBadgeEl) {
-    approvalBadgeEl.textContent = totalApprovalCnt;
-    approvalBadgeEl.style.display = totalApprovalCnt > 0 ? 'inline-block' : 'none';
+    approvalBadgeEl.textContent = approvalUnread;
+    approvalBadgeEl.style.display = approvalUnread > 0 ? 'inline-block' : 'none';
   }
   const pendingEl = document.getElementById('pendingCnt');
   if (pendingEl) pendingEl.textContent = pendingCnt;
@@ -3457,17 +3461,21 @@ function updateBadge() {
   const tb = document.getElementById('topBadge');
   if (tb) tb.style.display = pendingCnt > 0 ? 'block' : 'none';
 
-  // 내 문서함 전체 갯수
+  // 내 문서함 미확인: 내가 기안한 문서 중 결재 완료/반려됐지만 아직 읽지 않은 것
   const myDocBadgeEl = document.getElementById('myDocsTotalBadge');
   if (myDocBadgeEl) {
-    const myTotal = DB.docs.filter(d => d && d.writer === currentUser.id).length;
-    myDocBadgeEl.textContent = myTotal;
-    myDocBadgeEl.style.display = myTotal > 0 ? 'inline-block' : 'none';
+    const myUnread = DB.docs.filter(d =>
+      d && !d.draft && d.writer === currentUser.id &&
+      d.approvers?.some(a => a?.status === 'approved' || a?.status === 'rejected') &&
+      !_readDocIds.has(String(d.id))
+    ).length;
+    myDocBadgeEl.textContent = myUnread;
+    myDocBadgeEl.style.display = myUnread > 0 ? 'inline-block' : 'none';
   }
-  // 공지사항 갯수
+  // 공지사항 미확인: 읽지 않은 공지 수
   const noticeBadge = document.getElementById('noticeBadge');
   if (noticeBadge) {
-    const nc = (DB.notices||[]).length;
+    const nc = (DB.notices||[]).filter(n => !_readNoticeIds.has(String(n.id))).length;
     noticeBadge.textContent = nc;
     noticeBadge.style.display = nc > 0 ? 'inline-block' : 'none';
   }
@@ -4584,6 +4592,9 @@ function saveDraft() {
     };
     DB.docs.push(draftDoc);
     sbSave('docs', id, draftDoc);
+    // 본인이 임시저장한 문서는 즉시 읽음 처리
+    _readDocIds.add(String(id));
+    try { localStorage.setItem('e_approval_read_docs', JSON.stringify([..._readDocIds])); } catch(e) {}
     showToast('임시저장되었습니다.','success');
   }
   selectedApprovers=[];
@@ -4663,6 +4674,9 @@ function submitDoc() {
     };
     DB.docs.push(submittedDoc);
     sbSave('docs', id, submittedDoc);
+    // 본인이 기안한 문서는 즉시 읽음 처리 (내 문서함 미확인 뱃지에서 제외)
+    _readDocIds.add(String(id));
+    try { localStorage.setItem('e_approval_read_docs', JSON.stringify([..._readDocIds])); } catch(e) {}
     broadcastNotif('doc_submit', { id: String(id), title, writerName: currentUser.name, writerId: currentUser.id, firstApproverId: approvers[0]?.id || null, waitingApproverIds: approvers.slice(1).map(a => a.id) });
     if (approvers[0]?.id) {
       sendDBNotif([approvers[0].id], { icon: '📋', kind: '결재 요청', title, sub: '기안자: ' + currentUser.name, page: 'doc', showApprovalReq: true, writerName: currentUser.name, docId: String(id) });
@@ -5812,6 +5826,13 @@ function showNoticeDetail(id) {
   if (!n) return;
   // 공지사항 확인 시 중복 알림 방지
   _seenNoticeIds.add(String(id));
+  // 읽음 처리 → 미확인 뱃지 즉시 감소
+  const _nid = String(id);
+  if (!_readNoticeIds.has(_nid)) {
+    _readNoticeIds.add(_nid);
+    try { localStorage.setItem('e_approval_read_notices', JSON.stringify([..._readNoticeIds])); } catch(e) {}
+    updateBadge();
+  }
   document.getElementById('modalDocTitle').textContent = (n.pin?'📌 ':'')+n.title;
   document.getElementById('modalDocBody').innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">
@@ -5836,7 +5857,11 @@ function deleteNotice(id) {
   const i = DB.notices.findIndex(n=>n.id===id);
   if (i>-1) DB.notices.splice(i,1);
   sbRemove('notices', id);
+  // 삭제된 공지 읽음 기록 정리
+  _readNoticeIds.delete(String(id));
+  try { localStorage.setItem('e_approval_read_notices', JSON.stringify([..._readNoticeIds])); } catch(e) {}
   loadNotice();
+  updateBadge();
   showToast('삭제되었습니다.','success');
 }
 
@@ -6805,6 +6830,10 @@ let   _loginTs               = 0;         // 로그인 시각(ms) - 이전 항�
 // 읽은 문서 ID (localStorage 연동 - F5 후에도 읽음 상태 유지)
 const _readDocIds = new Set(
   (() => { try { return JSON.parse(localStorage.getItem('e_approval_read_docs') || '[]'); } catch(e) { return []; } })()
+);
+// 읽은 공지사항 ID (localStorage 연동 - F5 후에도 읽음 상태 유지)
+const _readNoticeIds = new Set(
+  (() => { try { return JSON.parse(localStorage.getItem('e_approval_read_notices') || '[]'); } catch(e) { return []; } })()
 );
 
 function initSeenIds() {
