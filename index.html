@@ -6350,8 +6350,9 @@ function dmRenderList() {
   const pageSize = pageSizeEl ? parseInt(pageSizeEl.value) : 10;
   const visibleRows = pageSize > 0 ? rows.slice(0, pageSize) : rows;
   const hiddenCount = rows.length - visibleRows.length;
-  list.innerHTML = visibleRows.map(r => `
+  list.innerHTML = visibleRows.map((r, i) => `
     <div class="dm-row">
+      <span style="min-width:28px;text-align:right;font-size:11px;color:var(--text-sub);flex-shrink:0">${i + 1}</span>
       <input type="checkbox" class="dm-chk" data-id="${escHtml(String(r.id))}" onchange="dmUpdateCount()">
       <span class="dm-title">${r.badge} ${escHtml(r.title)}</span>
       <span class="dm-meta">${escHtml(r.meta)}</span>
