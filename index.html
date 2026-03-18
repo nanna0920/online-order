@@ -2459,14 +2459,9 @@ function initRealtime() {
             playNotifSound();
           }
         } else if (!p.writerId || p.writerId !== currentUser.id) {
-          // 대기 결재자(2번째 이후)는 자기 순서가 될 때 알림 → 지금은 생략
-          const isWaitingApprover = Array.isArray(p.waitingApproverIds) && p.waitingApproverIds.includes(currentUser.id);
-          if (!isWaitingApprover) {
-            // 결재자가 아닌 일반 사용자: 새 기안문서 즉시 알림
-            showTopNewAlert(`📄 새 기안문서: ${p.title}`, 'approvalBox');
-            showNotifPopup({ icon:'📄', kind:'새 기안문서', title: p.title, sub: `기안자: ${p.writerName || ''}`, page:'doc' });
-            playNotifSound();
-          }
+          // 결재라인(firstApprover + waitingApprovers)에 포함된 사용자에게만 알림
+          // → 대기 결재자(2번째 이후)는 자기 순서가 될 때 알림을 받으므로 여기서는 생략
+          // → 결재라인에 없는 일반 사용자는 알림 없음
         }
       } else {
         // 이미 다른 경로에서 표시됨 - 첫 번째 결재자 key만 동기화
@@ -6913,10 +6908,8 @@ function checkAndAlertNew(type, itemData) {
       // 대기 결재자(순서가 아직 안 됨) → 알림 없이 seen 처리만
       return;
     } else {
-      // 결재자가 아닌 일반 사용자 → 새 기안문서 알림
-      const label = itemData.type ? `새 문서: ${itemData.type}` : '새 문서 등록';
-      showTopNewAlert(`📄 ${label}`, 'approvalBox');
-      showNotifPopup({ icon:'📄', kind:'새 기안문서', title: itemData.title || label, sub: itemData.type || '', page:'doc' });
+      // 결재라인에 없는 일반 사용자 → 알림 없음
+      return;
     }
     playNotifSound();
 
