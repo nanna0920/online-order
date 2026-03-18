@@ -4910,15 +4910,9 @@ function viewDoc(docId) {
   const doc = DB.docs.find(d=>d.id===docId);
   if (!doc) return;
 
-  // 문서를 확인했으므로 이후 중복 알림 방지
+  // 문서를 열었으므로 이후 중복 알림 방지 (읽음 처리는 확인 버튼 클릭 시)
   const _sid = String(docId);
   _seenDocIds.add(_sid);
-  // 읽음 처리 → 앱 아이콘 뱃지 즉시 감소
-  if (!_readDocIds.has(_sid)) {
-    _readDocIds.add(_sid);
-    try { localStorage.setItem('e_approval_read_docs', JSON.stringify([..._readDocIds])); } catch(e) {}
-    updateBadge();
-  }
   if (currentUser) {
     // 결재 요청·완료·반려 알림 키 모두 seen 처리
     _seenApprovalNotifKeys.add(`${_sid}-${currentUser.id}`);
@@ -4982,10 +4976,12 @@ function viewDoc(docId) {
     const isAdmin = !!(currentUser && (currentUser.role === 'admin' || currentUser.pos === '부원장'));
     const isWriter = doc.writer === currentUser.id;
     const canEditDelete = isAdmin;
+    const _docAlreadyRead = _readDocIds.has(String(doc.id));
     footer.innerHTML = `
       ${canPrint ? `<button class="btn btn-outline" onclick="closeThenPrint('${doc.id}')">🖨️ 출력</button>` : ''}
       ${canEditDelete ? `<button class="btn btn-primary" id="inlineEditBtn" onclick="enableInlineEdit('${doc.id}')">✏️ 수정</button>` : ''}
       ${canEditDelete ? `<button class="btn btn-danger"  onclick="deleteDocFromApproval('${doc.id}')">🗑️ 삭제</button>` : ''}
+      ${!_docAlreadyRead ? `<button class="btn btn-primary" onclick="markDocRead('${doc.id}')">✅ 확인</button>` : ''}
       <button class="btn btn-secondary" onclick="closeModal('docViewModal')">닫기</button>
     `;
   }
@@ -5076,6 +5072,10 @@ function processApproval(docId, action) {
     }
   }
 
+  // 결재/반려 처리 = 확인으로 간주 → 읽음 처리
+  const _did = String(docId);
+  _readDocIds.add(_did);
+  try { localStorage.setItem('e_approval_read_docs', JSON.stringify([..._readDocIds])); } catch(e) {}
   closeModal('docViewModal');
   loadApprovalBox();
   updateBadge();
@@ -5824,15 +5824,8 @@ function renderNotice(list) {
 function showNoticeDetail(id) {
   const n = DB.notices.find(x=>x.id===id);
   if (!n) return;
-  // 공지사항 확인 시 중복 알림 방지
+  // 공지사항 열기 시 중복 알림 방지 (읽음 처리는 확인 버튼 클릭 시)
   _seenNoticeIds.add(String(id));
-  // 읽음 처리 → 미확인 뱃지 즉시 감소
-  const _nid = String(id);
-  if (!_readNoticeIds.has(_nid)) {
-    _readNoticeIds.add(_nid);
-    try { localStorage.setItem('e_approval_read_notices', JSON.stringify([..._readNoticeIds])); } catch(e) {}
-    updateBadge();
-  }
   document.getElementById('modalDocTitle').textContent = (n.pin?'📌 ':'')+n.title;
   document.getElementById('modalDocBody').innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">
@@ -5844,7 +5837,9 @@ function showNoticeDetail(id) {
   const isAdmin = !!(currentUser && (currentUser.role === 'admin' || currentUser.pos === '부원장'));
   const _canEditNotice = isAdmin || hasMenuPerm(currentUser, 'notice', 'w');
   const _canDelNotice  = isAdmin || hasMenuPerm(currentUser, 'notice', 'd');
+  const _noticeAlreadyRead = _readNoticeIds.has(String(n.id));
   document.getElementById('modalDocFooter').innerHTML =
+    (!_noticeAlreadyRead ? `<button class="btn btn-primary" onclick="markNoticeRead(${n.id})">✅ 확인</button>` : '') +
     (_canEditNotice ? `<button class="btn btn-outline" onclick="closeModal('docViewModal');editNotice(${n.id})">✏️ 수정</button>` : '') +
     (_canDelNotice  ? `<button class="btn btn-danger" onclick="closeModal('docViewModal');deleteNotice(${n.id})">🗑️ 삭제</button>` : '') +
     `<button class="btn btn-secondary" onclick="closeModal('docViewModal')">닫기</button>`;
@@ -5863,6 +5858,26 @@ function deleteNotice(id) {
   loadNotice();
   updateBadge();
   showToast('삭제되었습니다.','success');
+}
+
+// 공지사항 읽음 처리 (확인 버튼)
+function markNoticeRead(id) {
+  const _nid = String(id);
+  _readNoticeIds.add(_nid);
+  _seenNoticeIds.add(_nid);
+  try { localStorage.setItem('e_approval_read_notices', JSON.stringify([..._readNoticeIds])); } catch(e) {}
+  updateBadge();
+  closeModal('docViewModal');
+}
+
+// 문서 읽음 처리 (확인 버튼)
+function markDocRead(docId) {
+  const _sid = String(docId);
+  _readDocIds.add(_sid);
+  _seenDocIds.add(_sid);
+  try { localStorage.setItem('e_approval_read_docs', JSON.stringify([..._readDocIds])); } catch(e) {}
+  updateBadge();
+  closeModal('docViewModal');
 }
 
 function execCmd(cmd, val=null) {
