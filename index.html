@@ -5011,37 +5011,40 @@ function printDoc(docId) {
   if (printSigData) injectWriterSigDOM(tmp, printSigData);
   tmp.querySelectorAll('.form-sub').forEach(el => el.remove());
   const formTitle = tmp.querySelector('.form-title');
+  // form-title이 있으면 그 텍스트, 없으면(커스텀 서식) doc.title 사용
+  const titleText = formTitle ? formTitle.textContent.trim() : (doc.title || '');
+  const drafterName = writer ? writer.name : '';
+  const drafterSigHtml = printSigData
+    ? `<img src="${printSigData}" style="width:calc(${COL_W} - 4px);height:${SIG_IMG_H};object-fit:contain;display:block;margin:0 auto;" alt="서명">`
+    : '';
+  const combinedHtml = `<table style="width:100%;border-collapse:collapse;margin-bottom:12px;table-layout:fixed">
+    <colgroup>
+      <col style="width:auto">
+      <col style="width:1cm">
+      <col style="width:${COL_W}">
+      ${doc.approvers.map(() => `<col style="width:${COL_W}">`).join('')}
+    </colgroup>
+    <tr>
+      <td rowspan="3" style="${BS}text-align:center;font-size:40px;font-weight:700;letter-spacing:3px;padding:14px 20px;vertical-align:middle;color:#000">${titleText}</td>
+      <td rowspan="3" style="${BS}vertical-align:middle;text-align:center;font-size:15px;font-weight:700;padding:4px 2px;background:#cce8ff;color:#000;print-color-adjust:exact;-webkit-print-color-adjust:exact;line-height:1.8;letter-spacing:2px">결<br>재</td>
+      <td style="${BS}text-align:center;font-size:15px;font-weight:700;width:${COL_W};padding:4px 2px;background:#cce8ff;color:#000;print-color-adjust:exact;-webkit-print-color-adjust:exact">기안자</td>
+      ${apPos}
+    </tr>
+    <tr>
+      <td style="${BS}text-align:center;font-size:13px;font-weight:600;width:${COL_W};padding:4px 2px;background:#fffde0;color:#000;print-color-adjust:exact;-webkit-print-color-adjust:exact">${drafterName}</td>
+      ${apName}
+    </tr>
+    <tr>
+      <td style="${BS}text-align:center;width:${COL_W};vertical-align:middle;padding:3px 2px;overflow:hidden">${drafterSigHtml}</td>
+      ${apCells}
+    </tr>
+  </table>`;
   if (formTitle) {
-    const titleText = formTitle.textContent.trim();
-    // 결재란: 직위(1행) / 이름(2행) / 서명(3행) 으로 구성
-    // "결재" 레이블: 1cm 고정, <br>로 세로 텍스트
-    const drafterName = writer ? writer.name : '';
-    const drafterSigHtml = printSigData
-      ? `<img src="${printSigData}" style="width:calc(${COL_W} - 4px);height:${SIG_IMG_H};object-fit:contain;display:block;margin:0 auto;" alt="서명">`
-      : '';
-    const combinedHtml = `<table style="width:100%;border-collapse:collapse;margin-bottom:12px;table-layout:fixed">
-      <colgroup>
-        <col style="width:auto">
-        <col style="width:1cm">
-        <col style="width:${COL_W}">
-        ${doc.approvers.map(() => `<col style="width:${COL_W}">`).join('')}
-      </colgroup>
-      <tr>
-        <td rowspan="3" style="${BS}text-align:center;font-size:40px;font-weight:700;letter-spacing:3px;padding:14px 20px;vertical-align:middle;color:#000">${titleText}</td>
-        <td rowspan="3" style="${BS}vertical-align:middle;text-align:center;font-size:15px;font-weight:700;padding:4px 2px;background:#cce8ff;color:#000;print-color-adjust:exact;-webkit-print-color-adjust:exact;line-height:1.8;letter-spacing:2px">결<br>재</td>
-        <td style="${BS}text-align:center;font-size:15px;font-weight:700;width:${COL_W};padding:4px 2px;background:#cce8ff;color:#000;print-color-adjust:exact;-webkit-print-color-adjust:exact">기안자</td>
-        ${apPos}
-      </tr>
-      <tr>
-        <td style="${BS}text-align:center;font-size:13px;font-weight:600;width:${COL_W};padding:4px 2px;background:#fffde0;color:#000;print-color-adjust:exact;-webkit-print-color-adjust:exact">${drafterName}</td>
-        ${apName}
-      </tr>
-      <tr>
-        <td style="${BS}text-align:center;width:${COL_W};vertical-align:middle;padding:3px 2px;overflow:hidden">${drafterSigHtml}</td>
-        ${apCells}
-      </tr>
-    </table>`;
+    // 내장 서식: form-title 요소를 제목+결재행 테이블로 교체
     formTitle.outerHTML = combinedHtml;
+  } else {
+    // 커스텀 서식: form-title 없으므로 내용 맨 앞에 제목+결재행 테이블 삽입
+    tmp.insertAdjacentHTML('afterbegin', combinedHtml);
   }
   const renderedContent = tmp.innerHTML;
 
