@@ -720,84 +720,6 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
   display:flex; align-items:center; justify-content:center; padding:0 3px;
 }
 
-/* PWA 앱 설치 배너 */
-#pwaInstallBanner {
-  display:none; position:fixed; bottom:0; left:0; right:0;
-  background:var(--primary); color:#fff;
-  padding:14px 20px; z-index:9998;
-  align-items:center; gap:12px;
-  box-shadow:0 -4px 20px rgba(0,0,0,0.2);
-}
-#pwaInstallBanner .pwa-icon { font-size:28px; flex-shrink:0; }
-#pwaInstallBanner .pwa-text { flex:1; }
-#pwaInstallBanner .pwa-text strong { display:block; font-size:14px; }
-#pwaInstallBanner .pwa-text span { font-size:12px; opacity:.85; }
-#pwaInstallBanner .pwa-actions { display:flex; gap:8px; flex-shrink:0; }
-.pwa-install-btn {
-  background:#c8973a; color:#fff; border:none; border-radius:var(--radius-sm);
-  padding:8px 16px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit;
-}
-.pwa-dismiss-btn {
-  background:rgba(255,255,255,0.15); color:#fff; border:none; border-radius:var(--radius-sm);
-  padding:8px 12px; font-size:13px; cursor:pointer; font-family:inherit;
-}
-
-/* 로그인 화면 앱 설치 버튼 */
-#pwaLoginInstall { display:none; margin-top:24px; padding-top:20px; border-top:1px solid var(--border); }
-.btn-pwa-login {
-  width:100%; display:flex; align-items:center; gap:14px;
-  background:linear-gradient(135deg,var(--primary-dark),var(--primary));
-  color:#fff; border:none; border-radius:var(--radius); padding:14px 18px;
-  cursor:pointer; font-family:inherit; text-align:left;
-  box-shadow:var(--shadow); transition:transform .15s, box-shadow .15s;
-}
-.btn-pwa-login:active { transform:scale(0.98); }
-.btn-pwa-login .pwa-btn-icon { font-size:28px; flex-shrink:0; }
-.btn-pwa-login .pwa-btn-text strong { display:block; font-size:15px; font-weight:700; }
-.btn-pwa-login .pwa-btn-text span { font-size:12px; opacity:.82; display:block; margin-top:2px; }
-.btn-pwa-login .pwa-btn-arrow { margin-left:auto; font-size:18px; opacity:.7; flex-shrink:0; }
-
-/* iOS 안내 모달 (하단 시트) */
-#pwaIosModal {
-  display:none; position:fixed; inset:0; z-index:10000;
-}
-.pwa-ios-backdrop {
-  position:absolute; inset:0; background:rgba(0,0,0,0.5);
-}
-.pwa-ios-sheet {
-  position:absolute; bottom:0; left:0; right:0;
-  background:var(--surface); border-radius:20px 20px 0 0;
-  padding:24px 24px calc(24px + env(safe-area-inset-bottom));
-  box-shadow:0 -8px 40px rgba(0,0,0,0.2);
-  animation:slideUp .3s cubic-bezier(.4,0,.2,1);
-}
-@keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
-.pwa-ios-sheet h3 { font-size:18px; font-weight:700; color:var(--primary); margin-bottom:6px; }
-.pwa-ios-sheet > p { font-size:13px; color:var(--text-sub); margin-bottom:20px; }
-.pwa-ios-steps { display:flex; flex-direction:column; gap:14px; margin-bottom:20px; }
-.pwa-ios-step {
-  display:flex; align-items:flex-start; gap:12px;
-  background:var(--surface2); border-radius:var(--radius); padding:12px 14px;
-  border:1px solid var(--border);
-}
-.pwa-ios-step .step-num {
-  background:var(--primary); color:#fff; border-radius:50%;
-  width:24px; height:24px; flex-shrink:0; font-size:12px; font-weight:700;
-  display:flex; align-items:center; justify-content:center;
-}
-.pwa-ios-step .step-desc { font-size:13px; color:var(--text); line-height:1.5; }
-.pwa-ios-step .step-desc strong { color:var(--primary); }
-.pwa-ios-arrow-hint {
-  text-align:center; font-size:13px; color:var(--accent);
-  font-weight:700; padding:10px; background:#fff8e8;
-  border-radius:var(--radius-sm); margin-bottom:16px;
-  border:1px dashed var(--accent);
-}
-.pwa-ios-close {
-  width:100%; padding:14px; background:var(--primary); color:#fff;
-  border:none; border-radius:var(--radius); font-size:15px; font-weight:700;
-  cursor:pointer; font-family:inherit;
-}
 
 /* ── 모바일 (768px 이하) ── */
 @media(max-width:768px) {
@@ -896,71 +818,11 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
         <span style="font-size:13px;color:var(--text-sub)">계정이 없으신가요? </span>
         <button class="link-text" onclick="showRegister()">회원가입</button>
       </div>
-      <!-- 앱 설치 버튼 (모바일에서만 표시, 이미 설치된 경우 숨김) -->
-      <div id="pwaLoginInstall">
-        <button class="btn-pwa-login" onclick="installPWA()">
-          <span class="pwa-btn-icon">📲</span>
-          <div class="pwa-btn-text">
-            <strong>홈 화면에 앱 설치</strong>
-            <span>설치하면 앱처럼 빠르게 접속할 수 있어요</span>
-          </div>
-          <span class="pwa-btn-arrow">›</span>
-        </button>
-      </div>
-      <div id="loginCompanyInfo" style="margin-top:32px;padding-top:20px;border-top:1px solid var(--border);text-align:center"></div>
+<div id="loginCompanyInfo" style="margin-top:32px;padding-top:20px;border-top:1px solid var(--border);text-align:center"></div>
     </div>
   </div>
 </div>
 
-<!-- iOS 홈 화면 추가 안내 모달 -->
-<div id="pwaIosModal">
-  <div class="pwa-ios-backdrop" onclick="closePwaIosModal()"></div>
-  <div class="pwa-ios-sheet">
-    <h3>📲 홈 화면에 앱 추가</h3>
-    <p>아래 순서대로 따라하시면 앱처럼 설치됩니다</p>
-    <div class="pwa-ios-steps">
-      <div class="pwa-ios-step">
-        <div class="step-num">1</div>
-        <div class="step-desc">화면 하단의 <strong>공유 버튼 ⎙</strong>을 탭하세요</div>
-      </div>
-      <div class="pwa-ios-step">
-        <div class="step-num">2</div>
-        <div class="step-desc">메뉴에서 <strong>'홈 화면에 추가'</strong>를 탭하세요</div>
-      </div>
-      <div class="pwa-ios-step">
-        <div class="step-num">3</div>
-        <div class="step-desc">오른쪽 상단 <strong>'추가'</strong>를 탭하면 완료!</div>
-      </div>
-    </div>
-    <div class="pwa-ios-arrow-hint">⬆ Safari 하단의 공유(⎙) 버튼을 탭하세요</div>
-    <button class="pwa-ios-close" onclick="closePwaIosModal()">확인</button>
-  </div>
-</div>
-
-<!-- Android 수동 설치 안내 모달 (Firefox, Opera, Brave 등) -->
-<div id="pwaAndroidModal">
-  <div class="pwa-ios-backdrop" onclick="closePwaAndroidModal()"></div>
-  <div class="pwa-ios-sheet">
-    <h3>📲 홈 화면에 앱 추가</h3>
-    <p>아래 순서대로 따라하시면 앱처럼 설치됩니다</p>
-    <div class="pwa-ios-steps">
-      <div class="pwa-ios-step">
-        <div class="step-num">1</div>
-        <div class="step-desc">브라우저 우측 상단 <strong>메뉴(⋮)</strong>를 탭하세요</div>
-      </div>
-      <div class="pwa-ios-step">
-        <div class="step-num">2</div>
-        <div class="step-desc"><strong>'홈 화면에 추가'</strong> 또는 <strong>'앱 설치'</strong>를 선택하세요</div>
-      </div>
-      <div class="pwa-ios-step">
-        <div class="step-num">3</div>
-        <div class="step-desc"><strong>'추가'</strong> 버튼을 탭하면 설치 완료!</div>
-      </div>
-    </div>
-    <div class="pwa-ios-arrow-hint">⋮ 브라우저 오른쪽 상단 메뉴를 탭하세요</div>
-    <button class="pwa-ios-close" onclick="closePwaAndroidModal()">확인</button>
-  </div>
-</div>
 
 <!-- REGISTER PAGE -->
 <div id="registerPage" style="display:none">
@@ -1006,18 +868,6 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
   </div>
 </div>
 
-<!-- PWA 앱 설치 배너 -->
-<div id="pwaInstallBanner">
-  <div class="pwa-icon">📋</div>
-  <div class="pwa-text">
-    <strong>전자결재 앱 설치</strong>
-    <span>홈 화면에 추가하여 앱처럼 사용하세요</span>
-  </div>
-  <div class="pwa-actions">
-    <button class="pwa-install-btn" onclick="installPWA()">설치</button>
-    <button class="pwa-dismiss-btn" onclick="dismissPWAInstall()">닫기</button>
-  </div>
-</div>
 
 <!-- MAIN APP -->
 <div id="appPage" style="display:none">
@@ -8295,121 +8145,6 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// ── PWA 설치 ──────────────────────────────────────────────
-
-// 플랫폼 감지
-const _isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-const _isAndroid = /android/i.test(navigator.userAgent);
-const _isMobile = _isIOS || _isAndroid || window.innerWidth <= 768;
-// 이미 홈 화면에서 실행 중(standalone)?
-const _isStandalone =
-  window.matchMedia('(display-mode: standalone)').matches ||
-  window.navigator.standalone === true;
-// 인앱브라우저 감지 (카카오톡, 네이버, 인스타, 페이스북 등 WebView 기반)
-const _isInAppBrowser = /KAKAOTALK|kakaotalk|NAVER\/|naver\/|Instagram|FBAV|FB_IAB|Line\/[0-9]|MicroMessenger|Whale\/|DaumApps/i.test(navigator.userAgent);
-
-let _pwaInstallPrompt = null;
-
-// Android: 설치 프롬프트 이벤트 저장
-window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();
-  _pwaInstallPrompt = e;
-  _updatePwaUI();
-});
-
-// 설치 완료 시 UI 숨김
-window.addEventListener('appinstalled', () => {
-  _pwaInstallPrompt = null;
-  _hidePwaUI();
-});
-
-// 설치 버튼/배너 표시 여부 초기화
-function _updatePwaUI() {
-  // 이미 설치된 경우(standalone 모드) → 모두 숨김
-  if (_isStandalone) { _hidePwaUI(); return; }
-
-  // 모바일이면 브라우저 종류 상관없이 로그인 화면 설치 버튼 표시
-  if (_isMobile) {
-    const loginInstall = document.getElementById('pwaLoginInstall');
-    if (loginInstall) loginInstall.style.display = 'block';
-  }
-
-  // beforeinstallprompt 이벤트가 있으면 하단 배너도 추가 표시
-  if (_pwaInstallPrompt) {
-    const banner = document.getElementById('pwaInstallBanner');
-    if (banner) banner.style.display = 'flex';
-  }
-}
-
-function _hidePwaUI() {
-  const els = ['pwaInstallBanner', 'pwaLoginInstall'];
-  els.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = 'none';
-  });
-}
-
-// 설치 버튼 클릭 처리 (브라우저별 분기)
-function installPWA() {
-  if (_isStandalone) return;
-
-  // ① beforeinstallprompt 지원 브라우저 (Android Chrome/Edge/삼성 인터넷 등)
-  if (_pwaInstallPrompt) {
-    _pwaInstallPrompt.prompt();
-    _pwaInstallPrompt.userChoice.then(choice => {
-      _pwaInstallPrompt = null;
-      if (choice.outcome === 'accepted') _hidePwaUI();
-    });
-    return;
-  }
-
-  // ② iOS Safari → 단계별 안내 모달
-  if (_isIOS) {
-    const isSafari = /safari/i.test(navigator.userAgent) &&
-                     !/crios|fxios|opios|chrome/i.test(navigator.userAgent);
-    if (isSafari) {
-      const modal = document.getElementById('pwaIosModal');
-      if (modal) modal.style.display = 'block';
-    } else {
-      // iOS 인앱브라우저 (카카오톡, 네이버 등) → Safari로 유도
-      showToast('Safari 브라우저로 열어주세요: 공유(⎙) → 홈 화면에 추가', 'info');
-    }
-    return;
-  }
-
-  // ③ Android
-  if (_isAndroid) {
-    if (_isInAppBrowser) {
-      // 카카오톡·네이버·인스타 등 인앱 WebView: PWA 설치 불가 → Chrome으로 유도
-      showToast('Chrome 또는 삼성 인터넷 앱에서 이 페이지를 열어주세요', 'info');
-    } else {
-      // Firefox·Opera·Brave 등 일반 브라우저: 메뉴에서 직접 설치 가능
-      const modal = document.getElementById('pwaAndroidModal');
-      if (modal) modal.style.display = 'block';
-    }
-    return;
-  }
-}
-
-function closePwaAndroidModal() {
-  const modal = document.getElementById('pwaAndroidModal');
-  if (modal) modal.style.display = 'none';
-}
-
-function dismissPWAInstall() {
-  _hidePwaUI();
-  _pwaInstallPrompt = null;
-}
-
-function closePwaIosModal() {
-  const modal = document.getElementById('pwaIosModal');
-  if (modal) modal.style.display = 'none';
-}
-
-// 페이지 로드 후 설치 UI 초기화 (모든 모바일 브라우저)
-window.addEventListener('load', () => {
-  if (!_isStandalone) _updatePwaUI();
-});
 
 // 모바일 사이드바 토글
 function toggleMobileSidebar() {
