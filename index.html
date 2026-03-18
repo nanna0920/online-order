@@ -2280,7 +2280,13 @@ async function loadFromSupabase() {
     if (error) throw error;
     if (data && data.length > 0) {
       const byType = {};
-      data.forEach(r => { if (!byType[r.type]) byType[r.type] = []; byType[r.type].push(r.data); });
+      data.forEach(r => {
+        if (!byType[r.type]) byType[r.type] = [];
+        // memoAll/memoTeam: _updatedAt 포함 (NEW 뱃지 당일 판별용)
+        const item = (r.type === 'memoAll' || r.type === 'memoTeam')
+          ? { ...r.data, _updatedAt: r.updated_at } : r.data;
+        byType[r.type].push(item);
+      });
       if (byType.docs && byType.docs.length)      DB.docs      = byType.docs;
       if (byType.users && byType.users.length)     DB.users     = byType.users;
       if (byType.notices && byType.notices.length) DB.notices   = byType.notices;
@@ -2946,9 +2952,19 @@ async function fullSyncSupabase() {
     // DB 갱신: fullSyncSupabase는 select('*')로 전체 조회하므로
     // 해당 타입 데이터가 없으면 실제로 삭제된 것 → 무조건 덮어씌워야 삭제 반영됨
     const toArr = key => (byType[key] || []).map(r => r.data);
+    // memoAll/memoTeam: _updatedAt 포함 버전 (NEW 뱃지 당일 판별용)
+    const toArrMemo = key => (byType[key] || []).map(r => ({ ...r.data, _updatedAt: r.updated_at }));
     // 로컬 pending 항목 보존: 비동기 upsert 중 fullSync로 데이터가 사라지는 레이스 컨디션 방지
     const toArrMerge = (key) => {
       const server = toArr(key);
+      const pending = (DB[key] || []).filter(item => _localChanges.has(sbId(key, item.id)));
+      if (!pending.length) return server;
+      const merged = [...server];
+      pending.forEach(item => { if (!merged.find(m => m.id === item.id)) merged.push(item); });
+      return merged;
+    };
+    const toArrMemoMerge = (key) => {
+      const server = toArrMemo(key);
       const pending = (DB[key] || []).filter(item => _localChanges.has(sbId(key, item.id)));
       if (!pending.length) return server;
       const merged = [...server];
@@ -2981,8 +2997,8 @@ async function fullSyncSupabase() {
     if (byType.depts)      DB.depts     = toArr('depts');
     if (byType.templates)  DB.templates = toArr('templates');
     if (byType.settings && byType.settings.length) { DB.settings = byType.settings[0].data; renderLoginCompanyInfo(); }
-    if (byType.memoAll)    DB.memoAll    = toArrMerge('memoAll');
-    if (byType.memoTeam)   DB.memoTeam   = toArrMerge('memoTeam');
+    if (byType.memoAll)    DB.memoAll    = toArrMemoMerge('memoAll');
+    if (byType.memoTeam)   DB.memoTeam   = toArrMemoMerge('memoTeam');
 
     // 서버 타임스탬프로 _lastSyncTime 갱신 (notification 제외: 잔여 알림 타임스탬프 왜곡 방지)
     const maxTs = data.reduce((m, r) => (r.type !== 'notification' && r.updated_at && r.updated_at > m) ? r.updated_at : m, '');
@@ -3543,17 +3559,13 @@ function renderCal(type) {
   const memos = (type === 'all' ? DB.memoAll : DB.memoTeam.filter(m => m.team === team))
                   .filter(m => m.date.startsWith(monthPfx));
   const memoMap = {};
-  const memoNewMap = {}; // {date → true} : 오늘 등록된 메모
+  const memoNewMap = {}; // {date → true} : 오늘 등록/수정된 메모
   const _todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
   memos.forEach(m => {
     memoMap[m.date] = m.content;
-    // ID 마지막 숫자 부분이 Date.now() 타임스탬프
-    const _ts = parseInt(String(m.id).split('-').pop());
-    if (!isNaN(_ts) && _ts > 1e12) {
-      const _d = new Date(_ts);
-      if (_d.getFullYear() === today.getFullYear() && _d.getMonth() === today.getMonth() && _d.getDate() === today.getDate()) {
-        memoNewMap[m.date] = true;
-      }
+    // _updatedAt(ISO) 앞 10자리 = YYYY-MM-DD 로 오늘 여부 판별
+    if (m._updatedAt && m._updatedAt.slice(0, 10) === _todayStr) {
+      memoNewMap[m.date] = true;
     }
   });
 
@@ -3562,11 +3574,10 @@ function renderCal(type) {
   if (type === 'all') {
     DB.memoTeam.filter(m => m.date.startsWith(monthPfx) && !m.date.endsWith('-00')).forEach(m => {
       if (!teamMemosByDate[m.date]) teamMemosByDate[m.date] = [];
-      const _tmTs = parseInt(String(m.id).split('-').pop());
-      const _tmIsNew = !isNaN(_tmTs) && _tmTs > 1e12 && (() => { const _d = new Date(_tmTs); return _d.getFullYear() === today.getFullYear() && _d.getMonth() === today.getMonth() && _d.getDate() === today.getDate(); })();
+      const _tmIsNew = !!(m._updatedAt && m._updatedAt.slice(0, 10) === _todayStr);
       teamMemosByDate[m.date].push({ team: m.team, content: m.content, isNew: _tmIsNew });
     });
-    // 팀별 메모가 오늘 등록된 날짜도 날짜 뱃지(memoNewMap)에 포함
+    // 팀별 메모가 오늘 등록/수정된 날짜도 날짜 뱃지(memoNewMap)에 포함
     Object.entries(teamMemosByDate).forEach(([date, tms]) => {
       if (tms.some(tm => tm.isNew)) memoNewMap[date] = true;
     });
@@ -3865,9 +3876,10 @@ function calSaveEditor() {
     if (existing) { sbRemove(sbType, existing.id); arr.splice(arr.indexOf(existing), 1); }
   } else if (existing) {
     existing.content = content;
+    existing._updatedAt = new Date().toISOString();
     sbSave(sbType, existing.id, existing);
   } else {
-    const nm = { id: ds + (team ? '-' + team : '') + '-' + Date.now(), date: ds, content, author: currentUser.id };
+    const nm = { id: ds + (team ? '-' + team : '') + '-' + Date.now(), date: ds, content, author: currentUser.id, _updatedAt: new Date().toISOString() };
     if (team) nm.team = team;
     arr.push(nm);
     sbSave(sbType, nm.id, nm);
