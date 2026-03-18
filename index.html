@@ -2539,7 +2539,14 @@ function sendDBNotif(userIds, notifData) {
   const icon = notifData.icon || '🔔';
   const pushTitle = `${icon} ${notifData.kind || '알림'}`;
   const pushBody = notifData.title + (notifData.sub ? '\n' + notifData.sub : '');
-  sendPushToUsers(userIds, pushTitle, pushBody);
+  // 수신자별 결재 대기 건수 계산 → 앱 아이콘 배지에 표시
+  const badgeCounts = {};
+  userIds.forEach(uid => {
+    badgeCounts[uid] = DB.docs.filter(d =>
+      d && !d.draft && d.approvers?.some(a => a?.id === uid && a?.status === 'pending')
+    ).length;
+  });
+  sendPushToUsers(userIds, pushTitle, pushBody, badgeCounts);
 }
 
 // ============================================================
@@ -2589,7 +2596,7 @@ async function subscribePush() {
   } catch(e) { console.warn('Push subscribe 오류:', e); }
 }
 
-async function sendPushToUsers(userIds, title, body) {
+async function sendPushToUsers(userIds, title, body, badgeCounts = {}) {
   if (!userIds || !userIds.length) return;
   try {
     const { data: rows } = await sb.from('e_approval').select('*').eq('type', 'push_subscription');
@@ -2600,11 +2607,14 @@ async function sendPushToUsers(userIds, title, body) {
     await Promise.all(targets.map(async r => {
       const sub = r.data?.subscription;
       if (!sub) return;
+      const uid = r.data?.userId;
+      // 수신자별 미결재 건수 → SW가 앱 아이콘 배지 업데이트에 사용
+      const badge = (badgeCounts[uid] != null) ? badgeCounts[uid] : 1;
       try {
         const res = await fetch(EDGE_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY },
-          body: JSON.stringify({ subscription: sub, title, body, url: './' })
+          body: JSON.stringify({ subscription: sub, title, body, url: './', badge })
         });
         if (res.status === 410) {
           // 구독 만료 → DB에서 삭제

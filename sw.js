@@ -53,21 +53,39 @@ self.addEventListener('push', e => {
   if (!e.data) return;
   let data = {};
   try { data = e.data.json(); } catch { data = { title: '전자결재', body: e.data.text() }; }
-  e.waitUntil(
+
+  const tasks = [
     self.registration.showNotification(data.title || '전자결재시스템', {
       body: data.body || '',
       icon: './icon.svg',
       badge: './icon.svg',
       tag: 'e-approval',
-      data: { url: data.url || './' }
+      data: { url: data.url || './', badge: data.badge }
     })
-  );
+  ];
+
+  // 앱 아이콘 배지: 결재 대기 건수 표시 (앱이 닫혀 있을 때도 동작)
+  if (data.badge != null && 'setAppBadge' in self.navigator) {
+    tasks.push(
+      data.badge > 0
+        ? self.navigator.setAppBadge(data.badge).catch(() => {})
+        : self.navigator.clearAppBadge().catch(() => {})
+    );
+  }
+
+  e.waitUntil(Promise.all(tasks));
 });
 
-// 알림 클릭 시 앱 열기
+// 알림 클릭 시 앱 열기 + 배지 초기화
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   const targetUrl = (e.notification.data && e.notification.data.url) || './';
+
+  // 알림 클릭 시 배지 초기화 (앱이 열리면 정확한 수로 다시 설정됨)
+  if ('clearAppBadge' in self.navigator) {
+    self.navigator.clearAppBadge().catch(() => {});
+  }
+
   e.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then(list => {
