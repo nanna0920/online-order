@@ -3027,7 +3027,11 @@ function generateDocId(dept, year) {
 
 // 로그인 후 UI 적용 공통 함수 (doLogin / 자동 로그인 공용)
 function _applyLogin(user, showWelcome) {
-  localStorage.setItem('e_approval_uid', user.id); // 세션 유지
+  // 사용자 정보 저장 (비밀번호 제외) - F5 새로고침 후 즉시 복원용
+  try {
+    const { pw: _omit, ...userToStore } = user;
+    localStorage.setItem('e_approval_session', JSON.stringify(userToStore));
+  } catch(e) {}
   currentUser = user;
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('appPage').style.display = 'flex';
@@ -3080,7 +3084,8 @@ async function doLogin() {
 }
 
 function doLogout() {
-  localStorage.removeItem('e_approval_uid'); // 세션 삭제
+  localStorage.removeItem('e_approval_session'); // 세션 삭제
+  localStorage.removeItem('e_approval_uid');      // 이전 버전 키 정리
   if (_realtimeRetryTimer) { clearTimeout(_realtimeRetryTimer); _realtimeRetryTimer = null; }
   if (_realtimeChannel) { sb.removeChannel(_realtimeChannel); _realtimeChannel = null; }
   _realtimeConnecting = false;
@@ -6667,7 +6672,21 @@ function showToast(msg, type='info') {
 // ============================================================
 window.addEventListener('load', async ()=>{
   renderLoginCompanyInfo();
-  // 회사 설정 + 사용자 목록을 동시에 미리 로드
+
+  // ① 자동 로그인: localStorage에서 즉시 복원 (Supabase 대기 없음)
+  try {
+    const raw = localStorage.getItem('e_approval_session');
+    if (raw) {
+      const saved = JSON.parse(raw);
+      if (saved && saved.id && saved.active) {
+        _applyLogin(saved, false); // 즉시 로그인 - startPolling()이 내부에서 전체 데이터 로드
+        return;
+      }
+      localStorage.removeItem('e_approval_session'); // 유효하지 않은 세션 정리
+    }
+  } catch(e) { localStorage.removeItem('e_approval_session'); }
+
+  // ② 자동 로그인 없는 경우: 로그인 화면 준비 (설정·사용자 미리 로드)
   try {
     const [settingsRes, usersRes] = await Promise.all([
       sb.from('e_approval').select('*').eq('type','settings'),
@@ -6676,16 +6695,7 @@ window.addEventListener('load', async ()=>{
     if (settingsRes.data?.length) { DB.settings = settingsRes.data[0].data; renderLoginCompanyInfo(); }
     if (usersRes.data?.length)    { DB.users = usersRes.data.map(r => r.data); }
   } catch(e) {}
-  // 자동 로그인: 이전 세션 복원 (로그아웃 전까지 유지)
-  const savedUid = localStorage.getItem('e_approval_uid');
-  if (savedUid && DB.users.length > 0) {
-    const savedUser = DB.users.find(u => u.id === savedUid && u.active);
-    if (savedUser) { _applyLogin(savedUser, false); return; }
-    else { localStorage.removeItem('e_approval_uid'); } // 비활성/삭제 계정 정리
-  }
-  // Enter key login
   document.getElementById('loginPw').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
-  // 알림 버튼 초기 상태 반영
   updateNotifPermBtn();
 });
 
