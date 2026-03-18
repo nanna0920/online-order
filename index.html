@@ -3155,6 +3155,7 @@ async function doLogin() {
 function doLogout() {
   localStorage.removeItem('e_approval_session'); // 세션 삭제
   localStorage.removeItem('e_approval_uid');      // 이전 버전 키 정리
+  if ('clearAppBadge' in navigator) navigator.clearAppBadge().catch(() => {}); // 앱 아이콘 뱃지 초기화
   if (_realtimeRetryTimer) { clearTimeout(_realtimeRetryTimer); _realtimeRetryTimer = null; }
   if (_realtimeChannel) { sb.removeChannel(_realtimeChannel); _realtimeChannel = null; }
   _realtimeConnecting = false;
@@ -3337,6 +3338,17 @@ function updateBadge() {
 
   // 모바일 하단 네비 뱃지 동기화
   try { _syncMobileBadge(); } catch(e) {}
+
+  // 앱 아이콘 뱃지 (PWA 홈 화면 바로가기 아이콘 - Android/iOS)
+  // 읽지 않은 결재 대기 문서 수를 표시, 읽으면 즉시 감소
+  const unreadPendingCnt = myApprDocs.filter(d =>
+    d.approvers?.some(a => a?.id === currentUser.id && a?.status === 'pending') &&
+    !_readDocIds.has(String(d.id))
+  ).length;
+  if ('setAppBadge' in navigator) {
+    if (unreadPendingCnt > 0) navigator.setAppBadge(unreadPendingCnt).catch(() => {});
+    else navigator.clearAppBadge().catch(() => {});
+  }
 }
 
 // ============================================================
@@ -4697,6 +4709,12 @@ function viewDoc(docId) {
   // 문서를 확인했으므로 이후 중복 알림 방지
   const _sid = String(docId);
   _seenDocIds.add(_sid);
+  // 읽음 처리 → 앱 아이콘 뱃지 즉시 감소
+  if (!_readDocIds.has(_sid)) {
+    _readDocIds.add(_sid);
+    try { localStorage.setItem('e_approval_read_docs', JSON.stringify([..._readDocIds])); } catch(e) {}
+    updateBadge();
+  }
   if (currentUser) {
     // 결재 요청·완료·반려 알림 키 모두 seen 처리
     _seenApprovalNotifKeys.add(`${_sid}-${currentUser.id}`);
@@ -6401,6 +6419,10 @@ const _seenMemoAllIds        = new Set();
 const _seenMemoTeamIds       = new Set();
 const _seenApprovalNotifKeys = new Set(); // 결재 알림 중복 방지 (docId-userId / docId-approved / docId-rejected)
 let   _loginTs               = 0;         // 로그인 시각(ms) - 이전 항목 알림 방지용
+// 읽은 문서 ID (localStorage 연동 - F5 후에도 읽음 상태 유지)
+const _readDocIds = new Set(
+  (() => { try { return JSON.parse(localStorage.getItem('e_approval_read_docs') || '[]'); } catch(e) { return []; } })()
+);
 
 function initSeenIds() {
   _seenDocIds.clear();
