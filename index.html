@@ -4749,7 +4749,12 @@ function renderMyDocs(filter) {
   if (docs.length===0) { tbody.innerHTML=`<tr><td colspan="6"><div class="empty-state"><div class="icon">📄</div><p>문서가 없습니다.</p></div></td></tr>`; return; }
   const todayStr = new Date().toLocaleDateString('ko-KR').replaceAll('. ','-').replace('.','');
   docs = [...docs].sort((a,b)=>_dtSortKey(b)-_dtSortKey(a));
-  tbody.innerHTML = docs.map((d,i)=>`
+  tbody.innerHTML = docs.map((d,i)=>{
+    const _isRead = _readDocIds.has(String(d.id));
+    const _readBadge = d.draft ? '' : _isRead
+      ? `<span style="font-size:10px;background:#e8f5e9;color:#2e7d32;border-radius:10px;padding:2px 8px;font-weight:600;white-space:nowrap">확인완료</span>`
+      : `<span style="font-size:10px;background:#fff3e0;color:#e65100;border-radius:10px;padding:2px 8px;font-weight:600;white-space:nowrap">미확인</span>`;
+    return `
     <tr>
       <td style="color:var(--text-muted)">${i+1}</td>
       <td style="cursor:pointer;color:var(--primary);font-weight:500" onclick="viewDoc('${d.id}')">${d.title}${d.urgency==='urgent'?'<span class="chip" style="margin-left:6px;background:#ffe0b2;color:#e65100">긴급</span>':''}</td>
@@ -4757,12 +4762,14 @@ function renderMyDocs(filter) {
       <td>${getStatusBadge(d.status)}</td>
       <td>${d.date}${(d.time&&d.date===todayStr)?'<br><span style="font-size:11px;color:var(--text-sub)">'+d.time+'</span>':''}</td>
       <td>
+        ${_readBadge}
         <button class="btn btn-sm btn-outline" onclick="viewDoc('${d.id}')">상세</button>
         ${d.status==='approved'?`<button class="btn btn-sm btn-accent" style="background:#1a3a5c;color:#fff" onclick="printDoc('${d.id}')">🖨️ 출력</button>`:''}
         ${d.status==='draft'&&!!(currentUser && (currentUser.role === 'admin' || currentUser.pos === '부원장'))?`<button class="btn btn-sm btn-primary" onclick="editDoc('${d.id}')">✏️ 수정</button>`:''}
         ${d.status==='draft'&&hasMenuPerm(currentUser,'myDocs','d')?`<button class="btn btn-sm btn-danger" onclick="deleteDoc('${d.id}')">삭제</button>`:''}
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 
 function editDoc(docId) {
@@ -4878,6 +4885,10 @@ function renderApprovalBox(filter) {
       </div>${arrow}`;
     }).join('');
 
+    const _apprRead = _readDocIds.has(String(d.id));
+    const _apprReadBadge = _apprRead
+      ? `<span style="font-size:10px;background:#e8f5e9;color:#2e7d32;border-radius:10px;padding:2px 8px;font-weight:600;white-space:nowrap">확인완료</span>`
+      : `<span style="font-size:10px;background:#fff3e0;color:#e65100;border-radius:10px;padding:2px 8px;font-weight:600;white-space:nowrap">미확인</span>`;
     return `
     <tr>
       <td style="color:var(--text-muted)">${i+1}</td>
@@ -4890,6 +4901,7 @@ function renderApprovalBox(filter) {
       </td>
       <td>${d.urgency==='very-urgent'?'<span class="badge" style="background:#c0392b;color:#fff">매우 긴급</span>':d.urgency==='urgent'?'<span class="badge" style="background:#c0392b;color:#fff">긴급</span>':'<span style="color:var(--text-muted)">일반</span>'}</td>
       <td>
+        ${_apprReadBadge}
         ${filter==='pending'
           ? (hasMenuPerm(currentUser,'approvalBox','w')
               ? `<button class="btn btn-sm btn-primary" onclick="viewDoc('${d.id}')">✅ 결재처리</button>`
