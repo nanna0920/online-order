@@ -311,6 +311,23 @@ canvas#sigCanvas { display:block; cursor:crosshair; touch-action:none; }
 .modal-overlay.open { opacity:1; pointer-events:all; }
 .modal { background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow-lg);width:90%;max-width:560px;max-height:85vh;overflow-y:auto; transform:translateY(20px);transition:transform .2s; }
 .modal-overlay.open .modal { transform:translateY(0); }
+/* 서식 추가/수정 모달 리사이즈 */
+#templateModal .modal {
+  resize: both;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-width: 640px;
+  min-height: 500px;
+  max-height: 94vh;
+  max-width: none;
+  box-sizing: border-box;
+}
+#templateModal .modal-body {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
 .modal-header { padding:20px 24px 16px; border-bottom:1px solid var(--border); display:flex;align-items:center;justify-content:space-between; }
 .modal-header h3 { font-size:16px; font-weight:700; color:var(--primary); }
 .modal-close { background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted);line-height:1; }
@@ -1830,7 +1847,7 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
 
 <!-- 서식 편집 모달 -->
 <div class="modal-overlay" id="templateModal" style="z-index:1200">
-  <div class="modal" style="max-width:860px;width:96vw">
+  <div class="modal" style="width:96vw">
     <div class="modal-header">
       <h3 id="templateModalTitle">📋 서식 추가</h3>
       <button class="modal-close" onclick="closeModal('templateModal')">×</button>
@@ -1867,7 +1884,7 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
       </div>
 
       <!-- 에디터 툴바 -->
-      <div style="border:1.5px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
+      <div style="border:1.5px solid var(--border);border-radius:var(--radius-sm) var(--radius-sm) 0 0;overflow:hidden">
         <div class="doc-editor-toolbar" id="tplEditorToolbar">
           <select class="editor-select" onchange="tplExecCmd('formatBlock',this.value);this.value=''" title="단락 스타일">
             <option value="">단락</option>
@@ -1940,10 +1957,13 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
           <div class="editor-divider"></div>
           <span class="tbl-label" style="font-size:10px;color:var(--text-muted)">Tab: 다음 셀 &nbsp;|&nbsp; 셀 경계 드래그: 열/행 크기 조절</span>
         </div>
+      </div>
+      <!-- A4 용지 에디터 영역 (프린트 미리보기와 동일한 크기) -->
+      <div style="background:#e0e0e0;overflow:auto;padding:16px 8px;display:flex;justify-content:center;border:1.5px solid var(--border);border-top:none;border-radius:0 0 var(--radius-sm) var(--radius-sm)">
         <div id="templateEditor"
              class="doc-editor-area"
              contenteditable="true"
-             style="min-height:320px"
+             style="width:210mm;height:297mm;padding:20mm 18mm;box-shadow:0 4px 20px rgba(0,0,0,.25);flex-shrink:0;overflow-y:auto"
              data-placeholder="서식 내용을 입력하세요..."></div>
       </div>
       <p style="font-size:11px;color:var(--text-muted);margin-top:6px">
@@ -4958,7 +4978,18 @@ function printDoc(docId) {
   if (!doc) return;
   const writer = getUser(doc.writer);
   const now = new Date().toLocaleString('ko-KR');
-  const opinions = doc.approvers.filter(a=>a.opinion&&a.opinion.trim());
+  // doc.approvers 방어적 처리 (null/빈 항목 제거, getUser 폴백)
+  const approvers = (doc.approvers || []).filter(Boolean).map(a => {
+    const u = getUser(a.id) || {};
+    return {
+      ...a,
+      pos:  a.pos  || u.pos  || '',
+      name: a.name || u.name || '',
+      dept: a.dept || u.dept || '',
+    };
+  });
+
+  const opinions = approvers.filter(a=>a.opinion&&a.opinion.trim());
   const companyName = (DB.settings && DB.settings.companyName) || '';
   const urgencyText = {normal:'일반', urgent:'긴급', 'very-urgent':'매우긴급'}[doc.urgency] || '일반';
   const statusText = {approved:'결재완료', rejected:'반려', pending:'진행중', draft:'임시저장'}[doc.status] || '-';
@@ -4969,17 +5000,17 @@ function printDoc(docId) {
   const SIG_IMG_H = '1.2cm'; // 서명 이미지 높이 (2.4cm의 50%)
 
   // 직위 행 (연한 하늘색 배경)
-  const apPos = doc.approvers.map(a =>
+  const apPos = approvers.map(a =>
     `<td style="${BS}text-align:center;font-size:15px;font-weight:700;width:${COL_W};padding:4px 2px;background:#cce8ff;color:#000;print-color-adjust:exact;-webkit-print-color-adjust:exact">${a.pos}</td>`
   ).join('');
 
   // 이름 행 (연한 노란색 배경)
-  const apName = doc.approvers.map(a =>
+  const apName = approvers.map(a =>
     `<td style="${BS}text-align:center;font-size:13px;font-weight:600;width:${COL_W};padding:4px 2px;background:#fffde0;color:#000;print-color-adjust:exact;-webkit-print-color-adjust:exact">${a.name}</td>`
   ).join('');
 
   // 서명 행 - 칸 안에 잘림 없이 전체 표시
-  const apCells = doc.approvers.map(a => {
+  const apCells = approvers.map(a => {
     const approverUser = DB.users.find(u=>u.id===a.id);
     const sigImg = approverUser && approverUser.sigData
       ? `<img src="${approverUser.sigData}" style="width:calc(${COL_W} - 4px);height:${SIG_IMG_H};object-fit:contain;display:block;margin:0 auto;" alt="서명">`
@@ -5006,6 +5037,23 @@ function printDoc(docId) {
   // 내용 렌더링 후 form-title + 결재표를 하나의 table로 나란히 배치
   const tmp = document.createElement('div');
   tmp.innerHTML = renderDocContent(doc.content);
+  // 프린트 시 모든 테이블 너비를 결재 테이블(width:100%)과 동일하게 정규화
+  tmp.querySelectorAll('table').forEach(table => {
+    if (table.style.tableLayout === 'fixed') {
+      // 첫 행의 셀 픽셀 너비 합산 → 각 셀을 비율(%)로 변환 후 table width:100%
+      const firstRowCells = Array.from(
+        (table.querySelector('tr') || {querySelectorAll:()=>[]}).querySelectorAll('td, th')
+      );
+      const totalW = firstRowCells.reduce((s, c) => s + (parseFloat(c.style.width) || 0), 0);
+      if (totalW > 0) {
+        table.querySelectorAll('td, th').forEach(cell => {
+          const w = parseFloat(cell.style.width);
+          if (w > 0) cell.style.width = (w / totalW * 100).toFixed(3) + '%';
+        });
+      }
+    }
+    table.style.width = '100%';
+  });
   // 인쇄 미리보기 기안자 서명 주입
   const printSigData = doc.writerSigData || (getUser(doc.writer) || {}).sigData;
   if (printSigData) injectWriterSigDOM(tmp, printSigData);
@@ -5019,10 +5067,10 @@ function printDoc(docId) {
     : '';
   const combinedHtml = `<table style="width:100%;border-collapse:collapse;margin-bottom:12px;table-layout:fixed">
     <colgroup>
-      <col style="width:auto">
+      <col>
       <col style="width:1cm">
       <col style="width:${COL_W}">
-      ${doc.approvers.map(() => `<col style="width:${COL_W}">`).join('')}
+      ${approvers.map(() => `<col style="width:${COL_W}">`).join('')}
     </colgroup>
     <tr>
       <td rowspan="3" style="${BS}text-align:center;font-size:40px;font-weight:700;letter-spacing:3px;padding:14px 20px;vertical-align:middle;color:#000">${titleText}</td>
@@ -6948,9 +6996,52 @@ function tplInsertCheckbox() {
   document.execCommand('insertHTML', false, html);
 }
 
+// 서식 테이블 열 너비 정규화: 픽셀 → 비율(%), 테이블 너비 → 100%
+function _normalizeTplWidth(html) {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  tmp.querySelectorAll('table').forEach(table => {
+    if (table.style.tableLayout === 'fixed') {
+      // 첫 행 기준 픽셀 너비 합산 → 비율(%)로 변환
+      const firstRowCells = Array.from(
+        (table.querySelector('tr') || { querySelectorAll: () => [] }).querySelectorAll('td, th')
+      );
+      const totalW = firstRowCells.reduce((s, c) => s + (parseFloat(c.style.width) || 0), 0);
+      if (totalW > 0) {
+        table.querySelectorAll('td, th').forEach(cell => {
+          const w = parseFloat(cell.style.width);
+          if (w > 0) cell.style.width = (w / totalW * 100).toFixed(3) + '%';
+        });
+      }
+    }
+    // 픽셀로 고정된 테이블 너비를 100%로 초기화
+    if (table.style.width && table.style.width !== '100%' && !table.style.width.includes('%')) {
+      table.style.width = '100%';
+    }
+  });
+  return tmp.innerHTML;
+}
+
+// 등록된 모든 서식의 열 너비를 새 에디터 크기에 맞게 일괄 변환 (최초 1회)
+function _migrateTplWidthsOnce() {
+  if (localStorage.getItem('tpl_width_migrated_v3')) return;
+  let changed = 0;
+  DB.templates.forEach(t => {
+    const normalized = _normalizeTplWidth(t.content || '');
+    if (normalized !== t.content) {
+      t.content = normalized;
+      sbSave('templates', t.id, t);
+      changed++;
+    }
+  });
+  localStorage.setItem('tpl_width_migrated_v3', '1');
+  if (changed > 0) showToast(`${changed}개 서식의 열 너비가 새 편집기 크기에 맞게 업데이트되었습니다.`, 'success');
+}
+
 function loadTemplates() {
   const tbody = document.getElementById('templatesTbody');
   if (!tbody) return;
+  _migrateTplWidthsOnce();
   if (DB.templates.length === 0) {
     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:40px 20px;color:var(--text-muted)">
       <div style="font-size:40px;margin-bottom:10px">📋</div>
@@ -7006,7 +7097,7 @@ function openTemplateModal(editId=null) {
     document.getElementById('templateName').value = t.name;
     document.getElementById('templateDesc').value = t.desc || '';
     document.getElementById('templateDocType').value = t.docType || '';
-    document.getElementById('templateEditor').innerHTML = t.content || '';
+    document.getElementById('templateEditor').innerHTML = _normalizeTplWidth(t.content || '');
   } else {
     document.getElementById('templateName').value = '';
     document.getElementById('templateDesc').value = '';
@@ -8162,15 +8253,20 @@ function initTplTableEditing() {
       const table = cell.closest('table');
       if (!table) return;
       if (hit.type === 'col') {
-        // table-layout: fixed 강제 → 현재 각 열 너비 고정
+        // table-layout: fixed 강제 → 열 너비를 비율(%)로 고정, 테이블은 100% 유지
         table.style.tableLayout = 'fixed';
-        table.style.width = table.getBoundingClientRect().width + 'px';
+        table.style.width = '100%';
+        const tableW = table.getBoundingClientRect().width;
         Array.from(table.rows).forEach(row => {
-          Array.from(row.cells).forEach(c => { c.style.width = c.getBoundingClientRect().width + 'px'; });
+          Array.from(row.cells).forEach(c => {
+            const w = c.getBoundingClientRect().width;
+            c.style.width = (w / tableW * 100).toFixed(3) + '%';
+          });
         });
         const colIdx = cell.cellIndex;
         const colCells = Array.from(table.rows).map(r => r.cells[colIdx]).filter(Boolean);
-        _tplResizing = { type: 'col', startX: e.clientX, startSize: cell.getBoundingClientRect().width, cells: colCells };
+        const startSizePx = cell.getBoundingClientRect().width;
+        _tplResizing = { type: 'col', startX: e.clientX, startSize: startSizePx, tableW, cells: colCells };
       } else {
         const row = cell.closest('tr');
         _tplResizing = { type: 'row', startY: e.clientY, startSize: cell.getBoundingClientRect().height, cells: Array.from(row.cells) };
@@ -8210,8 +8306,9 @@ function initTplTableEditing() {
     if (_tplResizing) {
       if (_tplResizing.type === 'col') {
         const dx = e.clientX - _tplResizing.startX;
-        const newW = Math.max(30, _tplResizing.startSize + dx);
-        _tplResizing.cells.forEach(c => { c.style.width = newW + 'px'; });
+        const newWpx = Math.max(30, _tplResizing.startSize + dx);
+        const newWpct = (newWpx / _tplResizing.tableW * 100).toFixed(3) + '%';
+        _tplResizing.cells.forEach(c => { c.style.width = newWpct; });
       } else {
         const dy = e.clientY - _tplResizing.startY;
         const newH = Math.max(18, _tplResizing.startSize + dy);
