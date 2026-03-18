@@ -3063,12 +3063,17 @@ async function doLogin() {
   requestBrowserNotifPermission(); // 브라우저 알림 권한 요청
   _requestWakeLock();              // Chrome 백그라운드 탭 동결 방지 (Intensive Throttling 차단)
   _loginTs = Date.now();           // 로그인 시각 기록 (ms 단위 - 이전 항목 알림 방지)
-  initSeenIds();   // 로그인 시점의 기존 문서/공지·알림 ID 기록 (이후 새 항목만 알림)
   initRealtime();
-  await startPolling(); // Supabase 전체 동기화 완료 후 화면 렌더링 (뱃지 즉시 반영)
-  showPage('dashboard', null); // 동기화 완료 데이터로 화면 전환 → 뱃지 즉시 갱신
-  try { updateBadge(); } catch(e) { console.warn('뱃지 갱신 오류:', e); } // 최종 뱃지 갱신
+
+  // 즉시 화면 전환 (데이터 동기화를 기다리지 않음)
+  showPage('dashboard', null);
   showToast(`${user.name}님, 환영합니다! 👋`, 'success');
+
+  // 전체 데이터 동기화는 백그라운드에서 진행
+  startPolling().then(() => {
+    initSeenIds();   // 첫 동기화 완료 후 기존 항목 ID 기록 (이후 새 항목만 알림)
+    try { updateBadge(); } catch(e) {}
+  });
 }
 
 function doLogout() {
