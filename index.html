@@ -6412,6 +6412,8 @@ async function dmDeleteSelected() {
 
   if (selectAllChk) selectAllChk.checked = false;
   showToast(`${ids.length}개 항목이 삭제되었습니다.`, 'success');
+  // 사용자별 문서 탭이면 드롭다운 건수도 갱신
+  if (_dmCurrentTab === 'userDocs') _dmPopulateUserSelect();
   dmRenderList();
 }
 
