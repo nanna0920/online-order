@@ -1515,11 +1515,23 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
           </div>
           <div class="card-body">
             <!-- 탭 -->
-            <div style="display:flex;gap:6px;margin-bottom:14px;border-bottom:1.5px solid var(--border);padding-bottom:10px">
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;border-bottom:1.5px solid var(--border);padding-bottom:10px">
               <button class="btn btn-primary btn-sm" id="dmTabDocs"   onclick="dmSwitchTab('docs')"   >📄 기안 문서</button>
               <button class="btn btn-secondary btn-sm" id="dmTabNotices" onclick="dmSwitchTab('notices')">📢 공지사항</button>
               <button class="btn btn-secondary btn-sm" id="dmTabMemoAll" onclick="dmSwitchTab('memoAll')">📅 전체 월간행사</button>
               <button class="btn btn-secondary btn-sm" id="dmTabMemoTeam" onclick="dmSwitchTab('memoTeam')">📅 팀 월간행사</button>
+              <button class="btn btn-secondary btn-sm" id="dmTabUserDocs" onclick="dmSwitchTab('userDocs')">👤 사용자별 문서</button>
+            </div>
+            <!-- 사용자별 문서 - 사용자 선택 필터 -->
+            <div id="dmUserFilter" style="display:none;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px">
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <label style="font-size:13px;font-weight:600">👤 사용자 선택</label>
+                <select id="dmUserSelect" onchange="dmRenderList()" style="font-size:13px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;min-width:160px;cursor:pointer">
+                  <option value="">-- 사용자를 선택하세요 --</option>
+                </select>
+                <span id="dmUserDocCount" style="font-size:12px;color:var(--text-sub)"></span>
+                <button class="btn btn-danger btn-sm" style="margin-left:auto" onclick="dmDeleteAllByUser()">🗑️ 이 사용자 전체 삭제</button>
+              </div>
             </div>
             <!-- 도구 모음 -->
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
@@ -6273,10 +6285,14 @@ let _dmCurrentTab = 'docs';
 
 function dmSwitchTab(tab) {
   _dmCurrentTab = tab;
-  ['docs','notices','memoAll','memoTeam'].forEach(t => {
+  ['docs','notices','memoAll','memoTeam','userDocs'].forEach(t => {
     const btn = document.getElementById('dmTab' + t.charAt(0).toUpperCase() + t.slice(1));
     if (btn) btn.className = t===tab ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm';
   });
+  // 사용자별 문서 탭: 사용자 선택 필터 표시 + 드롭다운 채우기
+  const userFilter = document.getElementById('dmUserFilter');
+  if (userFilter) userFilter.style.display = tab === 'userDocs' ? '' : 'none';
+  if (tab === 'userDocs') _dmPopulateUserSelect();
   document.getElementById('dmSelectAll').checked = false;
   dmRenderList();
 }
@@ -6306,6 +6322,22 @@ function dmRenderList() {
       meta: `${m.date||''} · ${getUser(m.author)?.name||m.author||''}`,
       badge: '<span style="color:#8e44ad;font-size:11px">[전체]</span>'
     }));
+  } else if (_dmCurrentTab === 'userDocs') {
+    const uid = document.getElementById('dmUserSelect')?.value || '';
+    const countEl = document.getElementById('dmUserDocCount');
+    if (!uid) {
+      if (countEl) countEl.textContent = '';
+      list.innerHTML = '<div class="dm-empty">사용자를 선택하면 해당 사용자의 문서가 표시됩니다.</div>';
+      dmUpdateCount();
+      return;
+    }
+    rows = (DB.docs||[]).filter(d => d && d.writer === uid).map(d => ({
+      id: d.id,
+      title: d.title,
+      meta: `${d.type||''} · ${d.date||''} · ${d.draft?'임시저장':({approved:'결재완료',rejected:'반려',pending:'진행중'}[d.status]||d.status)}`,
+      badge: d.draft ? '<span style="color:#e67e22;font-size:11px">[임시]</span>' : (d.status==='approved'?'<span style="color:#27ae60;font-size:11px">[완료]</span>':d.status==='rejected'?'<span style="color:#e74c3c;font-size:11px">[반려]</span>':'<span style="color:#2980b9;font-size:11px">[진행]</span>')
+    }));
+    if (countEl) countEl.textContent = `총 ${rows.length}개`;
   } else if (_dmCurrentTab === 'memoTeam') {
     rows = (DB.memoTeam||[]).map(m => ({
       id: String(m.id),
@@ -6358,7 +6390,10 @@ async function dmDeleteSelected() {
     else if (_dmCurrentTab === 'notices')  ids = (DB.notices||[]).map(n => String(n.id));
     else if (_dmCurrentTab === 'memoAll')  ids = (DB.memoAll||[]).map(m => String(m.id));
     else if (_dmCurrentTab === 'memoTeam') ids = (DB.memoTeam||[]).map(m => String(m.id));
-    else ids = [];
+    else if (_dmCurrentTab === 'userDocs') {
+      const uid = document.getElementById('dmUserSelect')?.value || '';
+      ids = uid ? (DB.docs||[]).filter(d => d && d.writer === uid).map(d => String(d.id)) : [];
+    } else ids = [];
   } else {
     const checked = Array.from(document.querySelectorAll('#dmList .dm-chk:checked'));
     if (!checked.length) { showToast('삭제할 항목을 선택하세요.','warning'); return; }
@@ -6374,13 +6409,48 @@ async function dmDeleteSelected() {
   await Promise.all(ids.map(id => sbRemove(_dmCurrentTab, id)));
 
   // 삭제된 ID를 메모리에서 최종 제거 (비동기 중 폴링으로 복원된 항목도 제거)
-  if      (_dmCurrentTab === 'docs')     DB.docs     = (DB.docs||[]).filter(d => !deletedSet.has(String(d.id)));
+  if      (_dmCurrentTab === 'docs' || _dmCurrentTab === 'userDocs')
+                                         DB.docs     = (DB.docs||[]).filter(d => !deletedSet.has(String(d.id)));
   else if (_dmCurrentTab === 'notices')  DB.notices  = (DB.notices||[]).filter(n => !deletedSet.has(String(n.id)));
   else if (_dmCurrentTab === 'memoAll')  DB.memoAll  = (DB.memoAll||[]).filter(m => !deletedSet.has(String(m.id)));
   else if (_dmCurrentTab === 'memoTeam') DB.memoTeam = (DB.memoTeam||[]).filter(m => !deletedSet.has(String(m.id)));
 
   if (selectAllChk) selectAllChk.checked = false;
   showToast(`${ids.length}개 항목이 삭제되었습니다.`, 'success');
+  dmRenderList();
+}
+
+// 사용자별 문서 탭 - 사용자 드롭다운 채우기
+function _dmPopulateUserSelect() {
+  const sel = document.getElementById('dmUserSelect');
+  if (!sel) return;
+  const prev = sel.value;
+  // 문서가 1개 이상인 사용자만 표시, 이름 오름차순
+  const usersWithDocs = (DB.users || [])
+    .filter(u => (DB.docs || []).some(d => d && d.writer === u.id))
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ko'));
+  sel.innerHTML = '<option value="">-- 사용자를 선택하세요 --</option>'
+    + usersWithDocs.map(u => {
+        const cnt = (DB.docs || []).filter(d => d && d.writer === u.id).length;
+        return `<option value="${escHtml(u.id)}"${u.id === prev ? ' selected' : ''}>${escHtml(u.name)} (${u.dept||''} · ${cnt}건)</option>`;
+      }).join('');
+}
+
+// 사용자별 문서 탭 - 선택된 사용자의 문서 전체 삭제
+async function dmDeleteAllByUser() {
+  const sel = document.getElementById('dmUserSelect');
+  const uid = sel?.value || '';
+  if (!uid) { showToast('사용자를 먼저 선택하세요.', 'warning'); return; }
+  const user = (DB.users || []).find(u => u.id === uid);
+  const userName = user?.name || uid;
+  const ids = (DB.docs || []).filter(d => d && d.writer === uid).map(d => String(d.id));
+  if (!ids.length) { showToast('삭제할 문서가 없습니다.', 'warning'); return; }
+  if (!confirm(`"${userName}" 사용자의 문서 ${ids.length}개를 모두 영구 삭제합니다.\n삭제 후 복구할 수 없습니다. 계속하시겠습니까?`)) return;
+  const deletedSet = new Set(ids);
+  await Promise.all(ids.map(id => sbRemove('docs', id)));
+  DB.docs = (DB.docs || []).filter(d => !deletedSet.has(String(d.id)));
+  showToast(`"${userName}" 사용자의 문서 ${ids.length}개가 삭제되었습니다.`, 'success');
+  _dmPopulateUserSelect();
   dmRenderList();
 }
 
@@ -6430,9 +6500,12 @@ function loadSettings() {
     _dmCurrentTab = 'docs';
     const tabBtn = document.getElementById('dmTabDocs');
     if (tabBtn) { tabBtn.className='btn btn-primary btn-sm'; }
-    ['Notices','MemoAll','MemoTeam'].forEach(t => {
+    ['Notices','MemoAll','MemoTeam','UserDocs'].forEach(t => {
       const b = document.getElementById('dmTab'+t); if(b) b.className='btn btn-secondary btn-sm';
     });
+    // 사용자별 문서 필터 초기 숨김
+    const uf = document.getElementById('dmUserFilter');
+    if (uf) uf.style.display = 'none';
     dmRenderList();
   }
 }
