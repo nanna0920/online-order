@@ -807,6 +807,19 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
 
   /* 인쇄 문서 패딩 */
   .print-doc { padding:16px; }
+
+  /* 모바일 알림 팝업: 하단 네비 위에 표시 */
+  .notif-popup-wrap {
+    top: auto;
+    bottom: calc(62px + env(safe-area-inset-bottom));
+    left: 8px;
+    right: 8px;
+  }
+  .notif-popup {
+    min-width: 0;
+    max-width: 100%;
+    padding: 12px 14px 12px 16px;
+  }
 }
 
 /* ── 아주 작은 화면 (480px 이하) ── */
@@ -1595,6 +1608,7 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
   <nav class="mobile-bottom-nav" id="mobileBottomNav">
     <button class="mobile-nav-item" id="mnDashboard" onclick="showPage('dashboard',null);closeMobileSidebar()">
       <span class="mn-icon mn-cal-icon" id="mnCalIcon"><span class="mn-cal-top" id="mnCalTop"></span><span class="mn-cal-day" id="mnCalDay"></span></span><span>행사</span>
+      <span class="mobile-nav-badge" id="mobileCalBadge" style="display:none"></span>
     </button>
     <button class="mobile-nav-item" id="mnNotice" onclick="showPage('notice',null);closeMobileSidebar()">
       <span class="mn-icon">📢</span><span>공지</span>
@@ -1609,6 +1623,7 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
     </button>
     <button class="mobile-nav-item" id="mnMore" onclick="toggleMobileSidebar()">
       <span class="mn-icon">☰</span><span>더보기</span>
+      <span class="mobile-nav-badge" id="mobileDocsBadge" style="display:none"></span>
     </button>
   </nav>
 
@@ -2658,6 +2673,7 @@ let _notifPollInProgress = false;
 let _pollLastIds        = new Set();
 let _dataPreloaded      = false; // 로그인 전 데이터 미리 로드 여부 (startPolling 초기 fullSync 생략용)
 let _preloadPromise     = null;  // 로그인 화면에서 백그라운드 전체 데이터 프리로드 Promise
+let _newCalCount        = 0;     // 모바일 행사 아이콘 배지: 새 행사 등록 건수
 
 // ── 백그라운드 탭 동결 방지 (Chrome·Firefox·Edge·Safari 공통) ──────────
 // 전략 1: navigator.locks (Chrome/Edge/Firefox/Safari 15.4+)
@@ -3366,8 +3382,8 @@ function showPage(name, navEl) {
   document.getElementById('pageTitle').textContent = pageTitles[name] || name;
 
   // load content
-  if (name==='dashboard') loadDashboard();
-  if (name==='teamCal') renderCal('team');
+  if (name==='dashboard') { loadDashboard(); _newCalCount = 0; _updateMobileCalBadge(); }
+  if (name==='teamCal') { renderCal('team'); _newCalCount = 0; _updateMobileCalBadge(); }
   if (name==='writeDoc') { if (!editingDocId) openDocFormSelect(); }
   if (name==='myDocs') loadMyDocs();
   if (name==='approvalBox') loadApprovalBox();
@@ -7058,6 +7074,8 @@ function showNotifPopup({ icon, kind, title, sub, page, duration = 5000, refId, 
     showBrowserNotif(`${icon} ${kind}: ${title}`, sub || '');
     flashTabTitle(`${kind}: ${title}`);
   }
+  // 모바일 진동 (알림 발생 시 햅틱 피드백)
+  if ('vibrate' in navigator) { try { navigator.vibrate([80, 40, 80]); } catch(e) {} }
   // 탭이 보이는 상태: 인앱 팝업만 표시 (OS 알림과 중복 방지)
   _createNotifPopupEl({ icon, kind, title, sub, page, duration });
 }
@@ -7181,6 +7199,8 @@ function checkAndAlertNew(type, itemData) {
     _seenMemoAllIds.add(id);
     if (itemData.author === currentUser.id) return;
     const authorName = getUser(itemData.author)?.name || '누군가';
+    _newCalCount++;
+    _updateMobileCalBadge();
     showTopNewAlert(`📅 기관 월간 행사 등록`, 'dashboard');
     showNotifPopup({ icon:'📅', kind:'기관 월간 행사', title: itemData.title || `${itemData.date} 행사`, sub: `${authorName}님이 등록`, page:'calendar' });
     playNotifSound();
@@ -7192,6 +7212,8 @@ function checkAndAlertNew(type, itemData) {
     if (itemData.author === currentUser.id) return;
     const authorName = getUser(itemData.author)?.name || '누군가';
     const teamName   = itemData.team || '팀';
+    _newCalCount++;
+    _updateMobileCalBadge();
     showTopNewAlert(`📅 ${teamName} 행사 등록`, 'teamCal');
     showNotifPopup({ icon:'📅', kind:`${teamName} 행사`, title: itemData.title || `${itemData.date} 행사`, sub: `${authorName}님이 등록`, page:'calendar' });
     playNotifSound();
@@ -9039,18 +9061,33 @@ function _syncMobileBadge() {
   const noticeSrc = document.getElementById('noticeBadge');
   const noticeDst = document.getElementById('mobileNoticeBadge');
   if (noticeSrc && noticeDst) {
-    const cnt = noticeSrc.textContent;
-    noticeDst.textContent = cnt;
+    noticeDst.textContent = noticeSrc.textContent;
     noticeDst.style.display = noticeSrc.style.display;
   }
   // 결재함 뱃지
   const approvalSrc = document.getElementById('approvalBadge');
   const approvalDst = document.getElementById('mobileApprovalBadge');
   if (approvalSrc && approvalDst) {
-    const cnt = approvalSrc.textContent;
-    approvalDst.textContent = cnt;
+    approvalDst.textContent = approvalSrc.textContent;
     approvalDst.style.display = approvalSrc.style.display;
   }
+  // 내 문서함 미확인 → 더보기 뱃지
+  const docsSrc = document.getElementById('myDocsTotalBadge');
+  const docsDst = document.getElementById('mobileDocsBadge');
+  if (docsSrc && docsDst) {
+    docsDst.textContent = docsSrc.textContent;
+    docsDst.style.display = docsSrc.style.display;
+  }
+  // 행사 뱃지 (새 행사 등록 건수)
+  _updateMobileCalBadge();
+}
+
+// 행사 아이콘 배지 업데이트
+function _updateMobileCalBadge() {
+  const el = document.getElementById('mobileCalBadge');
+  if (!el) return;
+  el.textContent = _newCalCount;
+  el.style.display = _newCalCount > 0 ? 'flex' : 'none';
 }
 
 // ── 서식 모달 이동 (헤더 드래그) ────────────────────────────────────
