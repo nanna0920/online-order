@@ -2,8 +2,19 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>전자결재시스템 | e-Approval</title>
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1a3a5c">
+<meta name="description" content="온라인 전자결재 및 문서관리 시스템">
+<!-- iOS PWA -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="전자결재">
+<link rel="apple-touch-icon" href="icon.svg">
+<!-- Android -->
+<meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=Noto+Serif+KR:wght@400;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -657,6 +668,136 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
 .tbl-bg-palette .color-swatches { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:6px; }
 .tbl-bg-palette .color-swatch { width:18px; height:18px; border-radius:2px; border:1px solid #ccc; cursor:pointer; flex-shrink:0; }
 .tbl-bg-palette .color-swatch:hover { transform:scale(1.2); border-color:#555; }
+
+/* ============================================================
+   PWA / MOBILE RESPONSIVE
+   ============================================================ */
+
+/* 햄버거 버튼 (데스크톱에서는 숨김) */
+.hamburger-btn {
+  display:none; background:none; border:none; cursor:pointer;
+  padding:8px; border-radius:var(--radius-sm);
+  flex-direction:column; gap:5px; align-items:center; justify-content:center;
+  margin-right:8px;
+}
+.hamburger-btn span {
+  display:block; width:22px; height:2px;
+  background:var(--text); border-radius:2px; transition:all .28s;
+}
+.hamburger-btn.open span:nth-child(1) { transform:translateY(7px) rotate(45deg); }
+.hamburger-btn.open span:nth-child(2) { opacity:0; }
+.hamburger-btn.open span:nth-child(3) { transform:translateY(-7px) rotate(-45deg); }
+
+/* 사이드바 오버레이 (모바일 드로어용) */
+.sidebar-overlay {
+  display:none; position:fixed; inset:0;
+  background:rgba(0,0,0,0.45); z-index:199;
+  opacity:0; transition:opacity .28s;
+}
+
+/* 모바일 하단 네비게이션 */
+.mobile-bottom-nav {
+  display:none; position:fixed; bottom:0; left:0; right:0;
+  background:var(--surface); border-top:1.5px solid var(--border);
+  z-index:150; height:62px;
+  justify-content:space-around; align-items:stretch;
+  box-shadow:0 -2px 16px rgba(26,58,92,0.10);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.mobile-nav-item {
+  display:flex; flex:1; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+  border:none; background:none; cursor:pointer;
+  color:var(--text-sub); font-size:10px; font-family:inherit; font-weight:500;
+  position:relative; padding:6px 4px;
+  transition:color .18s;
+}
+.mobile-nav-item.active { color:var(--primary); }
+.mobile-nav-item .mn-icon { font-size:22px; line-height:1; }
+.mobile-nav-badge {
+  position:absolute; top:4px; right:calc(50% - 18px);
+  background:var(--danger); color:#fff; font-size:9px; font-weight:700;
+  min-width:14px; height:14px; border-radius:7px;
+  display:flex; align-items:center; justify-content:center; padding:0 3px;
+}
+
+/* PWA 앱 설치 배너 */
+#pwaInstallBanner {
+  display:none; position:fixed; bottom:0; left:0; right:0;
+  background:var(--primary); color:#fff;
+  padding:14px 20px; z-index:9998;
+  align-items:center; gap:12px;
+  box-shadow:0 -4px 20px rgba(0,0,0,0.2);
+}
+#pwaInstallBanner .pwa-icon { font-size:28px; flex-shrink:0; }
+#pwaInstallBanner .pwa-text { flex:1; }
+#pwaInstallBanner .pwa-text strong { display:block; font-size:14px; }
+#pwaInstallBanner .pwa-text span { font-size:12px; opacity:.85; }
+#pwaInstallBanner .pwa-actions { display:flex; gap:8px; flex-shrink:0; }
+.pwa-install-btn {
+  background:#c8973a; color:#fff; border:none; border-radius:var(--radius-sm);
+  padding:8px 16px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit;
+}
+.pwa-dismiss-btn {
+  background:rgba(255,255,255,0.15); color:#fff; border:none; border-radius:var(--radius-sm);
+  padding:8px 12px; font-size:13px; cursor:pointer; font-family:inherit;
+}
+
+/* ── 모바일 (768px 이하) ── */
+@media(max-width:768px) {
+  /* 로그인 페이지: 좌측 브랜딩 숨기고 폼만 전체 화면 */
+  .login-left { display:none; }
+  .login-right { width:100%; min-height:100svh; padding:env(safe-area-inset-top,40px) 28px 40px; }
+  .login-form-wrap h2 { font-size:22px; }
+
+  /* 사이드바: 슬라이드 드로어로 전환 */
+  .sidebar {
+    transform:translateX(-100%);
+    transition:transform .28s cubic-bezier(.4,0,.2,1);
+    z-index:200; box-shadow:var(--shadow-lg);
+  }
+  .sidebar.open { transform:translateX(0); }
+  .sidebar-overlay { display:block; pointer-events:none; }
+  .sidebar-overlay.show { opacity:1; pointer-events:all; }
+
+  /* 메인 콘텐츠: 사이드바 여백 제거 */
+  .main-content { margin-left:0; padding-bottom:72px; }
+
+  /* 상단바 */
+  .topbar { padding:0 4px 0 0; }
+  .hamburger-btn { display:flex; }
+  .topbar-title { font-size:14px; }
+
+  /* 상단바 버튼 텍스트 숨김 */
+  .topbar-actions .btn > span:not(.badge) { display:none; }
+
+  /* 페이지 패딩 축소 */
+  .page { padding:14px 10px; }
+
+  /* 카드 패딩 축소 */
+  .card-body { padding:14px 12px; }
+  .card-header { padding:12px 14px; }
+
+  /* 테이블 가로 스크롤 */
+  .table-wrap, .card-body > table { overflow-x:auto; display:block; }
+
+  /* 모달 전체 화면 */
+  .modal-content { max-width:100%; width:100%; margin:auto 0 0; border-radius:var(--radius) var(--radius) 0 0; max-height:92svh; }
+
+  /* 하단 네비게이션 표시 */
+  .mobile-bottom-nav { display:flex; }
+
+  /* 그리드 단일 열 */
+  .grid-2, .grid-3 { grid-template-columns:1fr; }
+
+  /* 인쇄 문서 패딩 */
+  .print-doc { padding:16px; }
+}
+
+/* ── 아주 작은 화면 (480px 이하) ── */
+@media(max-width:480px) {
+  .page { padding:10px 8px; }
+  .topbar-actions .icon-btn { padding:6px; font-size:16px; }
+}
 </style>
 </head>
 <body>
@@ -747,10 +888,25 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
   </div>
 </div>
 
+<!-- PWA 앱 설치 배너 -->
+<div id="pwaInstallBanner">
+  <div class="pwa-icon">📋</div>
+  <div class="pwa-text">
+    <strong>전자결재 앱 설치</strong>
+    <span>홈 화면에 추가하여 앱처럼 사용하세요</span>
+  </div>
+  <div class="pwa-actions">
+    <button class="pwa-install-btn" onclick="installPWA()">설치</button>
+    <button class="pwa-dismiss-btn" onclick="dismissPWAInstall()">닫기</button>
+  </div>
+</div>
+
 <!-- MAIN APP -->
 <div id="appPage" style="display:none">
+  <!-- 모바일 사이드바 오버레이 -->
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeMobileSidebar()"></div>
   <!-- SIDEBAR -->
-  <nav class="sidebar">
+  <nav class="sidebar" id="appSidebar">
     <div class="sidebar-header">
       <div class="sidebar-logo">
         <div class="logo-box">📋</div>
@@ -817,6 +973,9 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
   <!-- MAIN CONTENT -->
   <div class="main-content">
     <div class="topbar">
+      <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleMobileSidebar()" aria-label="메뉴 열기">
+        <span></span><span></span><span></span>
+      </button>
       <div class="topbar-title" id="pageTitle">📅 기관 월간 행사</div>
       <div class="topbar-actions">
         <div id="topNewAlert" onclick="topNewAlertClick()" title="클릭하면 해당 페이지로 이동합니다"></div>
@@ -1414,6 +1573,27 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
   </div>
   <button class="notif-close" onclick="closeApprovalReqNotif()">×</button>
 </div>
+
+  <!-- 모바일 하단 네비게이션 -->
+  <nav class="mobile-bottom-nav" id="mobileBottomNav">
+    <button class="mobile-nav-item" id="mnDashboard" onclick="showPage('dashboard',null);closeMobileSidebar()">
+      <span class="mn-icon">📅</span><span>행사</span>
+    </button>
+    <button class="mobile-nav-item" id="mnNotice" onclick="showPage('notice',null);closeMobileSidebar()">
+      <span class="mn-icon">📢</span><span>공지</span>
+      <span class="mobile-nav-badge" id="mobileNoticeBadge" style="display:none"></span>
+    </button>
+    <button class="mobile-nav-item" id="mnWriteDoc" onclick="showPage('writeDoc',null);closeMobileSidebar()">
+      <span class="mn-icon">✍️</span><span>기안</span>
+    </button>
+    <button class="mobile-nav-item" id="mnApproval" onclick="showPage('approvalBox',null);closeMobileSidebar()">
+      <span class="mn-icon">📥</span><span>결재함</span>
+      <span class="mobile-nav-badge" id="mobileApprovalBadge" style="display:none"></span>
+    </button>
+    <button class="mobile-nav-item" id="mnMore" onclick="toggleMobileSidebar()">
+      <span class="mn-icon">☰</span><span>더보기</span>
+    </button>
+  </nav>
 
 </div><!-- end appPage -->
 
@@ -3003,6 +3183,8 @@ function showPage(name, navEl) {
   if (name==='members') loadMembers();
   if (name==='settings') loadCompanySettings();
   try { updateBadge(); } catch(e) {}
+  // 모바일: 하단 네비 활성 탭 동기화 + 사이드바 닫기
+  try { _syncMobileNav(name); closeMobileSidebar(); } catch(e) {}
 }
 
 // ============================================================
@@ -3101,6 +3283,9 @@ function updateBadge() {
     d.approvers?.some(a => a?.id === currentUser.id && a?.status === 'pending')
   ).length;
   _setUrgentTabBlink(urgentPending > 0);
+
+  // 모바일 하단 네비 뱃지 동기화
+  try { _syncMobileBadge(); } catch(e) {}
 }
 
 // ============================================================
@@ -7978,6 +8163,96 @@ function _tblPickerClose(e) {
   const picker = document.getElementById('tableSizePicker');
   if (picker && !picker.contains(e.target)) picker.style.display = 'none';
 }
+
+// ============================================================
+// PWA / MOBILE
+// ============================================================
+
+// 서비스 워커 등록
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('[SW] 등록 완료:', reg.scope))
+      .catch(err => console.warn('[SW] 등록 실패:', err));
+  });
+}
+
+// 앱 설치 프롬프트
+let _pwaInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _pwaInstallPrompt = e;
+  const banner = document.getElementById('pwaInstallBanner');
+  if (banner) banner.style.display = 'flex';
+});
+window.addEventListener('appinstalled', () => {
+  _pwaInstallPrompt = null;
+  const banner = document.getElementById('pwaInstallBanner');
+  if (banner) banner.style.display = 'none';
+});
+
+function installPWA() {
+  if (!_pwaInstallPrompt) return;
+  _pwaInstallPrompt.prompt();
+  _pwaInstallPrompt.userChoice.then(() => {
+    _pwaInstallPrompt = null;
+    const banner = document.getElementById('pwaInstallBanner');
+    if (banner) banner.style.display = 'none';
+  });
+}
+function dismissPWAInstall() {
+  _pwaInstallPrompt = null;
+  const banner = document.getElementById('pwaInstallBanner');
+  if (banner) banner.style.display = 'none';
+}
+
+// 모바일 사이드바 토글
+function toggleMobileSidebar() {
+  const sidebar = document.getElementById('appSidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  const btn     = document.getElementById('hamburgerBtn');
+  if (!sidebar) return;
+  const isOpen = sidebar.classList.toggle('open');
+  overlay.classList.toggle('show', isOpen);
+  if (btn) btn.classList.toggle('open', isOpen);
+}
+function closeMobileSidebar() {
+  const sidebar = document.getElementById('appSidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  const btn     = document.getElementById('hamburgerBtn');
+  if (sidebar) sidebar.classList.remove('open');
+  if (overlay) overlay.classList.remove('show');
+  if (btn) btn.classList.remove('open');
+}
+
+// 모바일 하단 네비 활성 탭 동기화 (showPage 호출 시 연동)
+function _syncMobileNav(pageId) {
+  const map = { dashboard:'mnDashboard', notice:'mnNotice', writeDoc:'mnWriteDoc', approvalBox:'mnApproval' };
+  document.querySelectorAll('.mobile-nav-item').forEach(el => el.classList.remove('active'));
+  const target = map[pageId];
+  if (target) { const el = document.getElementById(target); if (el) el.classList.add('active'); }
+}
+
+// 모바일 하단 네비 뱃지 동기화 (updateBadge와 연동)
+function _syncMobileBadge() {
+  // 공지 뱃지
+  const noticeSrc = document.getElementById('noticeBadge');
+  const noticeDst = document.getElementById('mobileNoticeBadge');
+  if (noticeSrc && noticeDst) {
+    const cnt = noticeSrc.textContent;
+    noticeDst.textContent = cnt;
+    noticeDst.style.display = noticeSrc.style.display;
+  }
+  // 결재함 뱃지
+  const approvalSrc = document.getElementById('approvalBadge');
+  const approvalDst = document.getElementById('mobileApprovalBadge');
+  if (approvalSrc && approvalDst) {
+    const cnt = approvalSrc.textContent;
+    approvalDst.textContent = cnt;
+    approvalDst.style.display = approvalSrc.style.display;
+  }
+}
+
 
 </script>
 

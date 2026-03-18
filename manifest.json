@@ -1,0 +1,43 @@
+{
+  "name": "전자결재시스템",
+  "short_name": "전자결재",
+  "description": "온라인 전자결재 및 문서관리 시스템",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1a3a5c",
+  "theme_color": "#1a3a5c",
+  "orientation": "portrait-primary",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["productivity", "business"],
+  "shortcuts": [
+    {
+      "name": "문서 기안",
+      "short_name": "기안",
+      "description": "새 문서 기안",
+      "url": "./#writeDoc",
+      "icons": [{ "src": "icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "결재함",
+      "short_name": "결재함",
+      "description": "결재 대기 문서 확인",
+      "url": "./#approvalBox",
+      "icons": [{ "src": "icon.svg", "sizes": "any" }]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="80" fill="#1a3a5c"/>
+  <!-- Document body -->
+  <rect x="120" y="100" width="272" height="340" rx="16" fill="#ffffff" opacity="0.95"/>
+  <!-- Document fold corner -->
+  <polygon points="320,100 392,172 320,172" fill="#dde2ea"/>
+  <polygon points="320,100 392,172 320,172" fill="#1a3a5c" opacity="0.15"/>
+  <!-- Title bar -->
+  <rect x="148" y="140" width="130" height="16" rx="8" fill="#1a3a5c" opacity="0.8"/>
+  <!-- Lines -->
+  <rect x="148" y="178" width="216" height="11" rx="5.5" fill="#1a3a5c" opacity="0.25"/>
+  <rect x="148" y="202" width="185" height="11" rx="5.5" fill="#1a3a5c" opacity="0.25"/>
+  <rect x="148" y="226" width="200" height="11" rx="5.5" fill="#1a3a5c" opacity="0.25"/>
+  <!-- Divider -->
+  <rect x="148" y="260" width="216" height="1.5" fill="#dde2ea"/>
+  <!-- Approval stamps area -->
+  <rect x="148" y="280" width="60" height="60" rx="6" fill="#f0f2f5" stroke="#dde2ea" stroke-width="1.5"/>
+  <rect x="226" y="280" width="60" height="60" rx="6" fill="#f0f2f5" stroke="#dde2ea" stroke-width="1.5"/>
+  <rect x="304" y="280" width="60" height="60" rx="6" fill="#f0f2f5" stroke="#dde2ea" stroke-width="1.5"/>
+  <!-- Check badge (approval icon) -->
+  <circle cx="364" cy="364" r="72" fill="#c8973a"/>
+  <path d="M330 364 L352 386 L398 340" stroke="#ffffff" stroke-width="14" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
