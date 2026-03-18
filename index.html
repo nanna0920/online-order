@@ -3825,7 +3825,9 @@ function calOpenEditor(type, ds, team) {
   area.contentEditable = 'true';
   document.getElementById('calEditorSaveBtn').style.display = '';
   document.getElementById('calEditorToolbar').style.display = '';
-  document.getElementById('calEditorDeleteBtn').style.display = (existing && existing.content) ? '' : 'none';
+  const _delPermKey = type === 'all' ? 'dashboard' : 'teamCal';
+  const _canDel = (existing && existing.content) && hasMenuPerm(currentUser, _delPermKey, 'd');
+  document.getElementById('calEditorDeleteBtn').style.display = _canDel ? '' : 'none';
   area.focus();
 
   openModal('calEditorModal');
@@ -3964,15 +3966,19 @@ function calOpenSpecialEditor(type, monthPfx, team) {
   area.contentEditable = 'true';
   document.getElementById('calEditorSaveBtn').style.display = '';
   document.getElementById('calEditorToolbar').style.display = '';
-  document.getElementById('calEditorDeleteBtn').style.display = (existing && existing.content) ? '' : 'none';
+  const _spDelPermKey = type === 'all' ? 'dashboard' : 'teamCal';
+  const _spCanDel = (existing && existing.content) && hasMenuPerm(currentUser, _spDelPermKey, 'd');
+  document.getElementById('calEditorDeleteBtn').style.display = _spCanDel ? '' : 'none';
   openModal('calEditorModal');
   setTimeout(() => area.focus(), 50);
 }
 
 function calDeleteEditor() {
   if (!_calEditing) return;
-  if (!confirm('이 내용을 삭제하시겠습니까?')) return;
   const { type, ds, team } = _calEditing;
+  const _delKey = type === 'all' ? 'dashboard' : 'teamCal';
+  if (!hasMenuPerm(currentUser, _delKey, 'd')) { showToast('삭제 권한이 없습니다.', 'error'); return; }
+  if (!confirm('이 내용을 삭제하시겠습니까?')) return;
   const arr    = type === 'all' ? DB.memoAll : DB.memoTeam;
   const sbType = type === 'all' ? 'memoAll' : 'memoTeam';
   const existing = arr.find(m => m.date === ds && (type === 'all' || m.team === team));
@@ -4740,7 +4746,7 @@ function renderMyDocs(filter) {
         <button class="btn btn-sm btn-outline" onclick="viewDoc('${d.id}')">상세</button>
         ${d.status==='approved'?`<button class="btn btn-sm btn-accent" style="background:#1a3a5c;color:#fff" onclick="printDoc('${d.id}')">🖨️ 출력</button>`:''}
         ${d.status==='draft'&&!!(currentUser && (currentUser.role === 'admin' || currentUser.pos === '부원장'))?`<button class="btn btn-sm btn-primary" onclick="editDoc('${d.id}')">✏️ 수정</button>`:''}
-        ${d.status==='draft'&&hasMenuPerm(currentUser,'myDocs','w')?`<button class="btn btn-sm btn-danger" onclick="deleteDoc('${d.id}')">삭제</button>`:''}
+        ${d.status==='draft'&&hasMenuPerm(currentUser,'myDocs','d')?`<button class="btn btn-sm btn-danger" onclick="deleteDoc('${d.id}')">삭제</button>`:''}
       </td>
     </tr>`).join('');
 }
@@ -4772,7 +4778,7 @@ function editDoc(docId) {
 }
 
 async function deleteDoc(id) {
-  if (!hasMenuPerm(currentUser, 'myDocs', 'w')) { showToast('삭제 권한이 없습니다.', 'error'); return; }
+  if (!hasMenuPerm(currentUser, 'myDocs', 'd')) { showToast('삭제 권한이 없습니다.', 'error'); return; }
   if (!confirm('정말 삭제하시겠습니까?')) return;
   const i = DB.docs.findIndex(d=>d.id===id);
   if (i>-1) DB.docs.splice(i,1);
@@ -5794,11 +5800,10 @@ function renderNotice(list) {
         <div class="notice-content-preview">${n.content}</div>
         <div class="notice-meta">${n.date}${(n.time&&n.date===todayStr)?' '+n.time:''} · ${getUser(n.author).name} · ${getUser(n.author).pos}</div>
       </div>
-      ${hasMenuPerm(currentUser, 'notice', 'w')?`
-        <div style="display:flex;gap:6px" onclick="event.stopPropagation()">
-          <button class="btn btn-sm btn-outline no-print" onclick="editNotice(${n.id})">✏️ 수정</button>
-          <button class="btn btn-sm btn-danger no-print" onclick="deleteNotice(${n.id})">🗑️ 삭제</button>
-        </div>`:''}
+      <div style="display:flex;gap:6px" onclick="event.stopPropagation()">
+        ${hasMenuPerm(currentUser, 'notice', 'w')?`<button class="btn btn-sm btn-outline no-print" onclick="editNotice(${n.id})">✏️ 수정</button>`:''}
+        ${hasMenuPerm(currentUser, 'notice', 'd')?`<button class="btn btn-sm btn-danger no-print" onclick="deleteNotice(${n.id})">🗑️ 삭제</button>`:''}
+      </div>
     </div>`).join('');
 }
 
@@ -5816,15 +5821,17 @@ function showNoticeDetail(id) {
     <div style="font-size:14px;line-height:1.9;padding:4px 2px">${n.content}</div>
   `;
   const isAdmin = !!(currentUser && (currentUser.role === 'admin' || currentUser.pos === '부원장'));
+  const _canEditNotice = isAdmin || hasMenuPerm(currentUser, 'notice', 'w');
+  const _canDelNotice  = isAdmin || hasMenuPerm(currentUser, 'notice', 'd');
   document.getElementById('modalDocFooter').innerHTML =
-    (isAdmin ? `<button class="btn btn-outline" onclick="closeModal('docViewModal');editNotice(${n.id})">✏️ 수정</button>
-    <button class="btn btn-danger" onclick="closeModal('docViewModal');deleteNotice(${n.id})">🗑️ 삭제</button>` : '') +
+    (_canEditNotice ? `<button class="btn btn-outline" onclick="closeModal('docViewModal');editNotice(${n.id})">✏️ 수정</button>` : '') +
+    (_canDelNotice  ? `<button class="btn btn-danger" onclick="closeModal('docViewModal');deleteNotice(${n.id})">🗑️ 삭제</button>` : '') +
     `<button class="btn btn-secondary" onclick="closeModal('docViewModal')">닫기</button>`;
   openModal('docViewModal');
 }
 
 function deleteNotice(id) {
-  if (!isAdmin(currentUser) && !hasMenuPerm(currentUser, 'notice', 'w')) { showToast('공지사항 쓰기 권한이 없습니다.', 'error'); return; }
+  if (!isAdmin(currentUser) && !hasMenuPerm(currentUser, 'notice', 'd')) { showToast('공지사항 삭제 권한이 없습니다.', 'error'); return; }
   if (!confirm('공지사항을 삭제하시겠습니까?')) return;
   const i = DB.notices.findIndex(n=>n.id===id);
   if (i>-1) DB.notices.splice(i,1);
@@ -6208,32 +6215,41 @@ function toggleUserRole(uid) {
 // MENU PERMISSIONS
 // ============================================================
 const MENU_PERMS = [
-  {key:'dashboard',   label:'기관 월간 행사',  icon:'📅'},
-  {key:'notice',      label:'공지사항',         icon:'📢'},
-  {key:'teamCal',     label:'팀별 월간 행사',   icon:'📅'},
-  {key:'writeDoc',    label:'문서 기안',         icon:'✍️'},
-  {key:'myDocs',      label:'내 문서함',         icon:'📂'},
-  {key:'approvalBox', label:'결재함',            icon:'📥'},
+  {key:'dashboard',   label:'기관 월간 행사',  icon:'📅', hasDel:true},
+  {key:'notice',      label:'공지사항',         icon:'📢', hasDel:true},
+  {key:'teamCal',     label:'팀별 월간 행사',   icon:'📅', hasDel:true},
+  {key:'writeDoc',    label:'문서 기안',         icon:'✍️', hasDel:false},
+  {key:'myDocs',      label:'내 문서함',         icon:'📂', hasDel:true},
+  {key:'approvalBox', label:'결재함',            icon:'📥', hasDel:false},
 ];
 
-// user.menuPerms = { [key]: {r:bool, w:bool} } 구조로 읽기/쓰기 권한 관리
+// user.menuPerms = { [key]: {r:bool, w:bool, d:bool} } 구조로 읽기/쓰기/삭제 권한 관리
 // 구버전 user.menus(배열) 하위 호환 지원
 // 기본 권한: 기관 월간 행사·공지사항은 읽기만, 나머지 활성 메뉴는 읽기+쓰기, 결재함은 비활성
 const DEFAULT_MENU_PERMS = {
-  dashboard:   {r:true,  w:false}, // 기관 월간 행사 - 읽기만
-  notice:      {r:true,  w:false}, // 공지사항       - 읽기만
-  teamCal:     {r:true,  w:true},  // 팀별 월간 행사 - 읽기+쓰기
-  writeDoc:    {r:true,  w:true},  // 문서 기안      - 읽기+쓰기
-  myDocs:      {r:true,  w:true},  // 내 문서함      - 읽기+쓰기
-  approvalBox: {r:false, w:false}, // 결재함         - 비활성
+  dashboard:   {r:true,  w:false, d:false}, // 기관 월간 행사 - 읽기만
+  notice:      {r:true,  w:false, d:false}, // 공지사항       - 읽기만
+  teamCal:     {r:true,  w:true,  d:false}, // 팀별 월간 행사 - 읽기+쓰기
+  writeDoc:    {r:true,  w:true,  d:false}, // 문서 기안      - 읽기+쓰기
+  myDocs:      {r:true,  w:true,  d:false}, // 내 문서함      - 읽기+쓰기
+  approvalBox: {r:false, w:false, d:false}, // 결재함         - 비활성
 };
 
 function getMenuPermsObj(user) {
-  if (user.menuPerms && typeof user.menuPerms === 'object' && !Array.isArray(user.menuPerms)) return user.menuPerms;
-  // 구버전 user.menus 배열 호환: 배열에 포함된 메뉴는 읽기+쓰기로 처리
+  if (user.menuPerms && typeof user.menuPerms === 'object' && !Array.isArray(user.menuPerms)) {
+    // 구버전 호환: d 필드 없으면 w 값으로 기본 설정
+    const perms = user.menuPerms;
+    const result = {};
+    MENU_PERMS.forEach(m => {
+      const p = perms[m.key] || {r:false, w:false, d:false};
+      result[m.key] = { r: !!p.r, w: !!p.w, d: p.d !== undefined ? !!p.d : !!p.w };
+    });
+    return result;
+  }
+  // 구버전 user.menus 배열 호환: 배열에 포함된 메뉴는 읽기+쓰기+삭제로 처리
   if (Array.isArray(user.menus)) {
     const obj = {};
-    MENU_PERMS.forEach(m => { obj[m.key] = user.menus.includes(m.key) ? {r:true, w:true} : {r:false, w:false}; });
+    MENU_PERMS.forEach(m => { obj[m.key] = user.menus.includes(m.key) ? {r:true, w:true, d:true} : {r:false, w:false, d:false}; });
     return obj;
   }
   // 기본값 반환 (deep copy)
@@ -6248,10 +6264,11 @@ function hasMenuPerm(user, key, type) {
   return !!(perms[key]?.[type]);
 }
 
-// 활성화 체크박스 변경 시: 쓰기 연동
+// 활성화 체크박스 변경 시: 쓰기·삭제 연동
 function onMenuActiveChange(key) {
   const active = document.getElementById(`mperm_${key}_active`).checked;
   const wEl = document.getElementById(`mperm_${key}_w`);
+  const dEl = document.getElementById(`mperm_${key}_d`);
   const row = document.getElementById(`mperm_row_${key}`);
   if (active) {
     wEl.disabled = false;
@@ -6259,13 +6276,23 @@ function onMenuActiveChange(key) {
     row.style.background = '#fafcff';
     row.style.borderColor = 'var(--border)';
     row.style.opacity = '1';
+    if (dEl) { dEl.disabled = false; }
   } else {
     wEl.checked = false;
     wEl.disabled = true;
+    if (dEl) { dEl.checked = false; dEl.disabled = true; }
     row.style.background = '#f8f8f8';
     row.style.borderColor = '#e5e5e5';
     row.style.opacity = '0.7';
   }
+}
+// 쓰기 체크박스 변경 시: 삭제 연동 (쓰기 비활성 시 삭제도 비활성)
+function onMenuWriteChange(key) {
+  const wEl = document.getElementById(`mperm_${key}_w`);
+  const dEl = document.getElementById(`mperm_${key}_d`);
+  if (!dEl) return;
+  if (!wEl.checked) { dEl.checked = false; dEl.disabled = true; }
+  else { dEl.disabled = false; }
 }
 
 function openMenuPermModal(uid) {
@@ -6276,10 +6303,18 @@ function openMenuPermModal(uid) {
   const perms = getMenuPermsObj(u);
   document.getElementById('menuPermList').innerHTML = MENU_PERMS.map(m => {
     const hasW = !!(perms[m.key]?.w);
+    const hasD = !!(perms[m.key]?.d);
     const isActive = !!(perms[m.key]?.r || perms[m.key]?.w);
+    const delCell = m.hasDel ? `
+      <label style="display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer;
+                    padding:4px 6px;border-radius:6px;background:${hasD?'#fff0f0':'#f0f0f0'}">
+        <input type="checkbox" id="mperm_${m.key}_d" ${hasD?'checked':''} ${(!isActive||!hasW)?'disabled':''}
+               style="width:15px;height:15px;accent-color:#c0392b;cursor:pointer">
+        <span style="font-size:11px;font-weight:600;color:${hasD?'#c0392b':'#aaa'}">삭제</span>
+      </label>` : `<div></div>`;
     return `
     <div id="mperm_row_${m.key}"
-         style="display:grid;grid-template-columns:1fr 80px 80px;align-items:center;padding:10px 14px;
+         style="display:grid;grid-template-columns:1fr 80px 80px 80px;align-items:center;padding:10px 14px;gap:4px;
                 border:1.5px solid ${isActive?'var(--border)':'#e5e5e5'};border-radius:var(--radius-sm);
                 background:${isActive?'#fafcff':'#f8f8f8'};opacity:${isActive?'1':'0.7'};transition:.15s">
       <span style="display:flex;align-items:center;gap:8px">
@@ -6296,9 +6331,11 @@ function openMenuPermModal(uid) {
       <label style="display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer;
                     padding:4px 6px;border-radius:6px;background:${hasW?'#eef4ff':'#f0f0f0'}">
         <input type="checkbox" id="mperm_${m.key}_w" ${hasW?'checked':''} ${!isActive?'disabled':''}
+               onchange="onMenuWriteChange('${m.key}')"
                style="width:15px;height:15px;accent-color:#1a5cb0;cursor:pointer">
         <span style="font-size:11px;font-weight:600;color:${hasW?'#1a5cb0':'#aaa'}">쓰기</span>
       </label>
+      ${delCell}
     </div>`;
   }).join('');
   openModal('menuPermModal');
@@ -6311,9 +6348,9 @@ function saveMenuPerm() {
   const permsObj = {};
   MENU_PERMS.forEach(m => {
     const active = document.getElementById(`mperm_${m.key}_active`)?.checked || false;
-    // 활성화 = 읽기 허용, 쓰기는 별도 체크박스
     const w = active && (document.getElementById(`mperm_${m.key}_w`)?.checked || false);
-    permsObj[m.key] = {r: active, w};
+    const d = m.hasDel && w && (document.getElementById(`mperm_${m.key}_d`)?.checked || false);
+    permsObj[m.key] = {r: active, w, d};
   });
   u.menuPerms = permsObj;
   u.menus = MENU_PERMS.map(m => m.key).filter(k => permsObj[k]?.r);
