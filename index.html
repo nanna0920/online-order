@@ -2177,14 +2177,16 @@ async function sbRemove(type, itemId) {
 
 // 로그인 인증용: 사용자 데이터만 빠르게 로드
 async function loadUsersOnly() {
+  // 페이지 로드 시 미리 가져온 경우 즉시 반환 (네트워크 요청 없음)
+  if (DB.users && DB.users.length > 0) return true;
   try {
     const { data, error } = await sb.from('e_approval').select('*').eq('type', 'users');
     if (error) throw error;
     if (data && data.length > 0) {
       DB.users = data.map(r => r.data);
-      return DB.users.length > 0;
+      return true;
     }
-    return DB.users.length > 0;
+    return false;
   } catch(e) {
     console.error('사용자 로드 오류:', e);
     return false;
@@ -6663,10 +6665,14 @@ function showToast(msg, type='info') {
 // ============================================================
 window.addEventListener('load', async ()=>{
   renderLoginCompanyInfo();
-  // Supabase에서 회사 설정 미리 로드 (로그인 전에도 최신 회사 정보 표시)
+  // 회사 설정 + 사용자 목록을 동시에 미리 로드 (로그인 버튼 클릭 시 즉시 인증 가능하도록)
   try {
-    const {data} = await sb.from('e_approval').select('*').eq('type','settings');
-    if (data && data.length) { DB.settings = data[0].data; renderLoginCompanyInfo(); }
+    const [settingsRes, usersRes] = await Promise.all([
+      sb.from('e_approval').select('*').eq('type','settings'),
+      sb.from('e_approval').select('*').eq('type','users')
+    ]);
+    if (settingsRes.data?.length) { DB.settings = settingsRes.data[0].data; renderLoginCompanyInfo(); }
+    if (usersRes.data?.length)    { DB.users = usersRes.data.map(r => r.data); }
   } catch(e) {}
   // Enter key login
   document.getElementById('loginPw').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
