@@ -164,7 +164,7 @@ body { font-family:'Noto Sans KR',sans-serif; background:var(--bg); color:var(--
 #topNewAlert { display:none; padding:5px 14px; background:#e74c3c; color:#fff; font-size:12px; font-weight:700; border-radius:20px; cursor:pointer; white-space:nowrap; letter-spacing:0.3px; animation:topAlertBlink 0.8s ease-in-out infinite; max-width:220px; overflow:hidden; text-overflow:ellipsis; }
 @keyframes topAlertBlink { 0%,100%{opacity:1;box-shadow:0 0 8px rgba(231,76,60,0.7);} 50%{opacity:0.25;box-shadow:none;} }
 @keyframes newBadgeBlink { 0%,100%{opacity:1} 50%{opacity:0} }
-.new-badge-cal { display:inline-block; background:#e74c3c; color:#fff; font-weight:700; font-size:10px; border-radius:3px; padding:1px 4px; margin-left:3px; animation:newBadgeBlink 1s step-start infinite; vertical-align:middle; line-height:1.4; }
+.new-badge-cal { display:inline-block; color:#e74c3c; font-weight:700; font-size:10px; margin-left:3px; animation:newBadgeBlink 1s step-start infinite; vertical-align:middle; line-height:1; }
 .new-badge-notice { display:inline-block; background:#e74c3c; color:#fff; font-weight:700; font-size:10px; border-radius:3px; padding:1px 5px; margin-left:5px; animation:newBadgeBlink 1s step-start infinite; vertical-align:middle; line-height:1.4; }
 .icon-btn { width:36px; height:36px; border:none; background:var(--surface2); border-radius:var(--radius-sm); cursor:pointer; font-size:16px; display:flex;align-items:center;justify-content:center; transition:all .2s; color:var(--text-sub); position:relative; }
 .icon-btn:hover { background:var(--border); color:var(--primary); }
@@ -3566,6 +3566,10 @@ function renderCal(type) {
       const _tmIsNew = !isNaN(_tmTs) && _tmTs > 1e12 && (() => { const _d = new Date(_tmTs); return _d.getFullYear() === today.getFullYear() && _d.getMonth() === today.getMonth() && _d.getDate() === today.getDate(); })();
       teamMemosByDate[m.date].push({ team: m.team, content: m.content, isNew: _tmIsNew });
     });
+    // 팀별 메모가 오늘 등록된 날짜도 날짜 뱃지(memoNewMap)에 포함
+    Object.entries(teamMemosByDate).forEach(([date, tms]) => {
+      if (tms.some(tm => tm.isNew)) memoNewMap[date] = true;
+    });
   }
 
   // 테이블 행 생성
@@ -3607,7 +3611,7 @@ function renderCal(type) {
       ).join('');
     }
 
-    const newBadgeCal = (memoNewMap[ds] && content) ? '<span class="new-badge-cal">NEW</span>' : '';
+    const newBadgeCal = memoNewMap[ds] ? '<span class="new-badge-cal">NEW</span>' : '';
     cells += `<td class="${tdCls}" ${tdClickHandler}>
       <div class="cal-date-num">${d}${newBadgeCal}</div>
       <div class="${previewCls}">${content}</div>
