@@ -2657,6 +2657,7 @@ let _fullSyncInProgress = false;
 let _notifPollInProgress = false;
 let _pollLastIds        = new Set();
 let _dataPreloaded      = false; // 로그인 전 데이터 미리 로드 여부 (startPolling 초기 fullSync 생략용)
+let _preloadPromise     = null;  // 로그인 화면에서 백그라운드 전체 데이터 프리로드 Promise
 
 // ── 백그라운드 탭 동결 방지 (Chrome·Firefox·Edge·Safari 공통) ──────────
 // 전략 1: navigator.locks (Chrome/Edge/Firefox/Safari 15.4+)
@@ -3289,8 +3290,14 @@ async function doLogin() {
     showToast('아이디 또는 비밀번호가 잘못되었습니다.', 'error');
     return;
   }
-  // 인증 성공 → 전체 데이터 미리 로드 (로딩 버튼 유지)
-  try { await loadFromSupabase(); _dataPreloaded = true; } catch(e) { _dataPreloaded = false; }
+  // 인증 성공 → 백그라운드 프리로드 완료 대기 (이미 완료됐으면 즉시 진행)
+  if (_preloadPromise && !_dataPreloaded) {
+    try { await _preloadPromise; } catch(e) {}
+  }
+  // 프리로드 실패한 경우에만 직접 로드
+  if (!_dataPreloaded) {
+    try { await loadFromSupabase(); _dataPreloaded = true; } catch(e) { _dataPreloaded = false; }
+  }
   if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = '🔐 로그인'; }
   _applyLogin(user, true);
 }
@@ -7219,6 +7226,11 @@ window.addEventListener('load', async ()=>{
     if (settingsRes.data?.length) { DB.settings = settingsRes.data[0].data; renderLoginCompanyInfo(); }
     if (usersRes.data?.length)    { DB.users = usersRes.data.map(r => r.data); }
   } catch(e) {}
+  // 로그인 화면이 뜨는 순간부터 전체 데이터를 백그라운드에서 미리 로드 시작
+  // → 사용자가 ID/PW 입력하는 사이에 완료되어 로그인 버튼 클릭 시 즉시 진입
+  _preloadPromise = loadFromSupabase()
+    .then(() => { _dataPreloaded = true; })
+    .catch(() => {});
   document.getElementById('loginPw').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
   updateNotifPermBtn();
 });
