@@ -5531,13 +5531,72 @@ function enableInlineEdit(docId) {
 }
 
 function cancelInlineEdit(docId) {
+  _cleanupInlineEditHandlers();
   _inlineEditEl = null;
   viewDoc(docId);
 }
 
-// 모달 콘텐츠 영역에 표 편집 이벤트 연결
+// 모달 리사이즈 히트 감지 헬퍼 (셀 오른쪽/아래쪽 6px 이내)
+function _getModalResizeHit(e, contentEl) {
+  let el = e.target;
+  while (el && el !== contentEl) {
+    if (el.tagName === 'TD' || el.tagName === 'TH') break;
+    el = el.parentElement;
+  }
+  if (!el || (el.tagName !== 'TD' && el.tagName !== 'TH') || !contentEl.contains(el)) return null;
+  const rect = el.getBoundingClientRect();
+  const rx = e.clientX - rect.left, ry = e.clientY - rect.top;
+  const THRESH = 6;
+  if (rect.width  - rx <= THRESH && rx >= 0) return { type: 'col', cell: el };
+  if (rect.height - ry <= THRESH && ry >= 0) return { type: 'row', cell: el };
+  return null;
+}
+
+// document 레벨 핸들러 정리 (편집 취소/저장 시 호출)
+function _cleanupInlineEditHandlers() {
+  if (_inlineEditEl) {
+    if (_inlineEditEl._modalMoveHandler) document.removeEventListener('mousemove', _inlineEditEl._modalMoveHandler);
+    if (_inlineEditEl._modalUpHandler)   document.removeEventListener('mouseup',   _inlineEditEl._modalUpHandler);
+  }
+  _modalResizing = null;
+}
+
+// 모달 콘텐츠 영역에 표 편집 + 크기 조절 이벤트 연결
 function attachModalTableEditing(contentEl) {
+  // 커서 힌트: 셀 경계 근처에서 col-resize / row-resize 커서 표시
+  contentEl.addEventListener('mousemove', function(e) {
+    if (_modalResizing) return;
+    const hit = _getModalResizeHit(e, contentEl);
+    contentEl.style.cursor = hit ? (hit.type === 'col' ? 'col-resize' : 'row-resize') : '';
+  });
+
+  // mousedown: 리사이즈 우선 감지 → 그 다음 셀 선택/합병
   contentEl.addEventListener('mousedown', function(e) {
+    const hit = _getModalResizeHit(e, contentEl);
+    if (hit) {
+      e.preventDefault();
+      const cell = hit.cell;
+      const table = cell.closest('table');
+      if (!table) return;
+      if (hit.type === 'col') {
+        // table-layout: fixed + 모든 셀 너비를 % 로 고정
+        table.style.tableLayout = 'fixed';
+        table.style.width = '100%';
+        const tableW = table.getBoundingClientRect().width;
+        Array.from(table.rows).forEach(row =>
+          Array.from(row.cells).forEach(c => {
+            c.style.width = (c.getBoundingClientRect().width / tableW * 100).toFixed(3) + '%';
+          })
+        );
+        const colCells = Array.from(table.rows).map(r => r.cells[cell.cellIndex]).filter(Boolean);
+        _modalResizing = { type: 'col', startX: e.clientX, startSize: cell.getBoundingClientRect().width, tableW, cells: colCells };
+      } else {
+        const row = cell.closest('tr');
+        _modalResizing = { type: 'row', startY: e.clientY, startSize: cell.getBoundingClientRect().height, cells: Array.from(row.cells) };
+      }
+      return; // 셀 선택 로직 진입 방지
+    }
+
     const cell = e.target.closest('td, th');
     if (cell && contentEl.contains(cell)) {
       if (!cell.hasAttribute('contenteditable')) cell.setAttribute('contenteditable', 'true');
@@ -5560,17 +5619,44 @@ function attachModalTableEditing(contentEl) {
       updateMergeBtns('doc');
     }
   });
-  contentEl.addEventListener('mousemove', function(e) {
+
+  // document 레벨 mousemove: 리사이즈 드래그 반영 + 셀 선택 확장
+  const _onMove = function(e) {
+    if (_modalResizing) {
+      if (_modalResizing.type === 'col') {
+        const dx = e.clientX - _modalResizing.startX;
+        const newWpct = (Math.max(30, _modalResizing.startSize + dx) / _modalResizing.tableW * 100).toFixed(3) + '%';
+        _modalResizing.cells.forEach(c => { c.style.width = newWpct; });
+      } else {
+        const dy = e.clientY - _modalResizing.startY;
+        _modalResizing.cells.forEach(c => { c.style.height = Math.max(18, _modalResizing.startSize + dy) + 'px'; });
+      }
+      return;
+    }
     if (!_mergeSel.doc.dragging) return;
     const cell = e.target.closest('td, th');
     if (cell && contentEl.contains(cell) && cell.closest('table') === _mergeSel.doc.table) {
       updateMergeSelRect('doc', cell);
     }
-  });
-  contentEl.addEventListener('mouseup', function() {
+  };
+
+  // document 레벨 mouseup: 리사이즈 종료 + 셀 선택 종료
+  const _onUp = function() {
+    if (_modalResizing) {
+      _modalResizing = null;
+      contentEl.style.cursor = '';
+      return;
+    }
     _mergeSel.doc.dragging = false;
     updateMergeBtns('doc');
-  });
+  };
+
+  document.addEventListener('mousemove', _onMove);
+  document.addEventListener('mouseup',   _onUp);
+  // 정리용 참조 저장
+  contentEl._modalMoveHandler = _onMove;
+  contentEl._modalUpHandler   = _onUp;
+
   contentEl.addEventListener('focusin', function(e) {
     const cell = e.target.closest('td, th');
     if (cell && contentEl.contains(cell)) {
@@ -5579,6 +5665,7 @@ function attachModalTableEditing(contentEl) {
       updateMergeBtns('doc');
     }
   });
+
   contentEl.addEventListener('keydown', function(e) {
     if (e.key === 'Tab') {
       const cell = _docActiveCell;
@@ -5596,6 +5683,7 @@ async function saveInlineEdit(docId) {
   const contentEl = document.getElementById('modalDocBody').querySelector('.doc-view-content');
   if (!contentEl) return;
   doc.content = serializeEditorHTML(contentEl);
+  _cleanupInlineEditHandlers();
   _inlineEditEl = null;
   await sbSave('docs', doc.id, doc);
   showToast('문서가 수정되었습니다.', 'success');
@@ -8541,6 +8629,8 @@ function inlineChkChange(chk) {
 let _docActiveCell = null;
 // 결재함 상세보기 인라인 편집 대상 요소
 let _inlineEditEl = null;
+// 모달 인라인 편집 표 리사이즈 드래그 상태
+let _modalResizing = null;
 
 // 현재 포커스된 셀 반환
 function docGetActiveCell() {
