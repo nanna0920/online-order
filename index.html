@@ -5422,7 +5422,7 @@ function enableInlineEdit(docId) {
   const toolbar = document.createElement('div');
   toolbar.id = 'modalEditorToolbar';
   toolbar.className = 'doc-editor-toolbar';
-  toolbar.style.cssText = 'border-bottom:1px solid var(--border);margin-bottom:4px';
+  toolbar.style.cssText = 'position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--border);margin:-24px -24px 8px -24px;padding:4px 12px;';
   toolbar.innerHTML = `
     <select class="editor-select" onchange="docExecCmd('formatBlock',this.value);this.value=''" title="단락 스타일">
       <option value="">단락</option><option value="h2">제목 1</option><option value="h3">제목 2</option><option value="h4">제목 3</option><option value="p">본문</option>
@@ -5469,6 +5469,7 @@ function enableInlineEdit(docId) {
   // 표 편집 툴바 주입
   const tableTb = document.createElement('div');
   tableTb.id = 'modalTableToolbar';
+  tableTb.style.cssText = 'position:sticky;top:40px;z-index:19;';
   tableTb.innerHTML = `
     <span class="tbl-label">📊 표 편집</span>
     <div class="editor-divider"></div>
