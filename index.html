@@ -5333,6 +5333,9 @@ function renderDocContent(htmlContent) {
   // contenteditable 제거
   tmp.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
 
+  // 이름 옆 서명/도장 이미지 제거
+  tmp.querySelectorAll('img.writer-sig').forEach(el => el.remove());
+
   // 셀 선택/포커스 배경색 제거 + 행 높이 정규화 (글자 높이 2배)
   tmp.querySelectorAll('td, th').forEach(el => {
     el.classList.remove('cell-merge-selected');
