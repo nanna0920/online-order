@@ -1754,13 +1754,93 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
 
 <!-- 문서 상세/결재 모달 -->
 <div class="modal-overlay" id="docViewModal" style="z-index:1100">
-  <div class="modal" style="max-width:820px">
-    <div class="modal-header">
+  <div class="modal" style="max-width:820px;display:flex;flex-direction:column;overflow:hidden">
+    <div class="modal-header" style="flex-shrink:0">
       <h3 id="modalDocTitle">문서 상세</h3>
       <button class="modal-close" onclick="closeModal('docViewModal')">×</button>
     </div>
-    <div class="modal-body" id="modalDocBody"></div>
-    <div class="modal-footer" id="modalDocFooter"></div>
+    <!-- 인라인 편집 에디터 툴바 (수정 모드에서만 표시) -->
+    <div id="modalEditToolbar" style="display:none;flex-shrink:0">
+      <div id="modalEditorToolbar" class="doc-editor-toolbar" style="border-bottom:none;border-top:1.5px solid var(--border)">
+        <select class="editor-select" onchange="docExecCmd('formatBlock',this.value);this.value=''" title="단락 스타일">
+          <option value="">단락</option><option value="h2">제목 1</option><option value="h3">제목 2</option><option value="h4">제목 3</option><option value="p">본문</option>
+        </select>
+        <select class="editor-select" onchange="docExecCmd('fontSize',this.value);this.value=''" title="글자 크기" style="width:64px">
+          <option value="">크기</option><option value="1">10px</option><option value="2">12px</option><option value="3">14px</option><option value="4">16px</option><option value="5">18px</option><option value="6">24px</option>
+        </select>
+        <div class="editor-divider"></div>
+        <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('bold')" title="굵게"><b>B</b></button>
+        <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('italic')" title="기울임"><i>I</i></button>
+        <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('underline')" title="밑줄"><u>U</u></button>
+        <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('strikeThrough')" title="취소선"><s>S</s></button>
+        <div class="editor-divider"></div>
+        <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('justifyLeft')" title="왼쪽 정렬">◀</button>
+        <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('justifyCenter')" title="가운데 정렬">▬</button>
+        <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('justifyRight')" title="오른쪽 정렬">▶</button>
+        <div class="editor-divider"></div>
+        <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('insertUnorderedList')" title="글머리 기호">• 목록</button>
+        <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('insertOrderedList')" title="번호 목록">1. 목록</button>
+        <div class="editor-divider"></div>
+        <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('indent')" title="들여쓰기">→</button>
+        <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('outdent')" title="내어쓰기">←</button>
+        <div class="editor-divider"></div>
+        <div class="color-palette-wrap">
+          <button class="editor-btn color-palette-btn" id="modalFontColorBtn" onclick="togglePalette('modalFontPalette')" title="글자 색" style="gap:2px"><span id="modalFontColorSwatch" style="width:12px;height:12px;border-radius:2px;background:#1c2633;border:1px solid #ccc;display:inline-block"></span>A</button>
+          <div class="color-palette-popup" id="modalFontPalette">
+            <div class="cp-title">글자 색</div>
+            <div class="color-swatches" id="modalFontSwatches"></div>
+            <div class="color-custom-row"><label>직접 선택</label><input type="color" value="#1c2633" onchange="modalApplyDocColor('fore',this.value)"></div>
+          </div>
+        </div>
+        <div class="color-palette-wrap">
+          <button class="editor-btn color-palette-btn" id="modalBgColorBtn" onclick="togglePalette('modalBgPalette')" title="배경(형광펜) 색" style="gap:2px"><span id="modalBgColorSwatch" style="width:12px;height:12px;border-radius:2px;background:#ffff00;border:1px solid #ccc;display:inline-block"></span>🖍</button>
+          <div class="color-palette-popup" id="modalBgPalette">
+            <div class="cp-title">배경(형광펜) 색</div>
+            <div class="color-swatches" id="modalBgSwatches"></div>
+            <div class="color-custom-row"><label>직접 선택</label><input type="color" value="#ffff00" onchange="modalApplyDocColor('bg',this.value)"></div>
+          </div>
+        </div>
+        <div class="editor-divider"></div>
+        <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('removeFormat')" title="서식 제거" style="margin-left:auto">✕ 서식제거</button>
+      </div>
+      <div id="modalTableToolbar">
+        <span class="tbl-label">📊 표 편집</span>
+        <div class="editor-divider"></div>
+        <span class="tbl-label" style="font-weight:500">행:</span>
+        <button class="tbl-btn" onmousedown="event.preventDefault();docTableAddRow('above')">↑ 위 추가</button>
+        <button class="tbl-btn" onmousedown="event.preventDefault();docTableAddRow('below')">↓ 아래 추가</button>
+        <button class="tbl-btn danger" onmousedown="event.preventDefault();docTableDeleteRow()">✕ 행 삭제</button>
+        <div class="editor-divider"></div>
+        <span class="tbl-label" style="font-weight:500">열:</span>
+        <button class="tbl-btn" onmousedown="event.preventDefault();docTableAddCol('left')">← 왼쪽 추가</button>
+        <button class="tbl-btn" onmousedown="event.preventDefault();docTableAddCol('right')">→ 오른쪽 추가</button>
+        <button class="tbl-btn danger" onmousedown="event.preventDefault();docTableDeleteCol()">✕ 열 삭제</button>
+        <div class="editor-divider"></div>
+        <span class="tbl-label" style="font-weight:500">셀 합병:</span>
+        <button class="tbl-btn" id="modalMergeBtn" onmousedown="event.preventDefault()" onclick="mergeCells('doc')" disabled>⊞ 합치기</button>
+        <button class="tbl-btn" id="modalSplitBtn" onmousedown="event.preventDefault()" onclick="splitCell('doc')" disabled>⊟ 분리</button>
+        <div class="editor-divider"></div>
+        <span class="tbl-label" style="font-weight:500">셀 배경:</span>
+        <div class="tbl-bg-wrap">
+          <button class="tbl-btn" onmousedown="event.preventDefault()" onclick="toggleTblBgPalette('modalTblBgPalette')" style="display:flex;align-items:center;gap:4px;height:24px">
+            <span id="modalTblBgSwatch" style="width:13px;height:13px;border-radius:2px;background:#fff;border:1px solid #aaa;display:inline-block;flex-shrink:0"></span>배경색
+          </button>
+          <div class="tbl-bg-palette" id="modalTblBgPalette" onmousedown="event.preventDefault()">
+            <div class="cp-title">셀 배경색</div>
+            <div class="color-swatches" id="modalTblBgSwatches"></div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+              <label style="font-size:10px;color:var(--text-sub)">직접 선택</label>
+              <input type="color" value="#ffffff" onmousedown="event.stopPropagation()" onchange="modalTableSetBgColor(this.value)" style="width:36px;height:22px;border:none;cursor:pointer;padding:0">
+              <button class="tbl-btn danger" style="font-size:10px;padding:1px 6px;height:20px" onmousedown="event.preventDefault()" onclick="modalTableSetBgColor('')">초기화</button>
+            </div>
+          </div>
+        </div>
+        <div class="editor-divider"></div>
+        <span class="tbl-label" style="font-size:10px;color:var(--text-muted)">Tab: 다음 셀</span>
+      </div>
+    </div>
+    <div class="modal-body" id="modalDocBody" style="overflow-y:auto;flex:1;min-height:0"></div>
+    <div class="modal-footer" id="modalDocFooter" style="flex-shrink:0"></div>
   </div>
 </div>
 
@@ -4946,6 +5026,8 @@ function renderApprovalBox(filter) {
 // ============================================================
 function viewDoc(docId) {
   _inlineEditEl = null; // 인라인 편집 모드 초기화
+  const _mEdit = document.getElementById('modalEditToolbar');
+  if (_mEdit) _mEdit.style.display = 'none';
   const doc = DB.docs.find(d=>d.id===docId);
   if (!doc) return;
 
@@ -5415,112 +5497,11 @@ function enableInlineEdit(docId) {
   };
   contentEl.addEventListener('mousedown', contentEl._inlineChkHandler);
 
-  // 표 편집 이벤트 연결
+  // 표 편집 + 크기 조절 이벤트 연결
   attachModalTableEditing(contentEl);
 
-  // 에디터 툴바 주입
-  const toolbar = document.createElement('div');
-  toolbar.id = 'modalEditorToolbar';
-  toolbar.className = 'doc-editor-toolbar';
-  toolbar.style.cssText = 'position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--border);margin:-24px -24px 8px -24px;padding:4px 12px;';
-  toolbar.innerHTML = `
-    <select class="editor-select" onchange="docExecCmd('formatBlock',this.value);this.value=''" title="단락 스타일">
-      <option value="">단락</option><option value="h2">제목 1</option><option value="h3">제목 2</option><option value="h4">제목 3</option><option value="p">본문</option>
-    </select>
-    <select class="editor-select" onchange="docExecCmd('fontSize',this.value);this.value=''" title="글자 크기" style="width:64px">
-      <option value="">크기</option><option value="1">10px</option><option value="2">12px</option><option value="3">14px</option><option value="4">16px</option><option value="5">18px</option><option value="6">24px</option>
-    </select>
-    <div class="editor-divider"></div>
-    <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('bold')" title="굵게"><b>B</b></button>
-    <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('italic')" title="기울임"><i>I</i></button>
-    <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('underline')" title="밑줄"><u>U</u></button>
-    <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('strikeThrough')" title="취소선"><s>S</s></button>
-    <div class="editor-divider"></div>
-    <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('justifyLeft')" title="왼쪽 정렬">◀</button>
-    <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('justifyCenter')" title="가운데 정렬">▬</button>
-    <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('justifyRight')" title="오른쪽 정렬">▶</button>
-    <div class="editor-divider"></div>
-    <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('insertUnorderedList')" title="글머리 기호">• 목록</button>
-    <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('insertOrderedList')" title="번호 목록">1. 목록</button>
-    <div class="editor-divider"></div>
-    <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('indent')" title="들여쓰기">→</button>
-    <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('outdent')" title="내어쓰기">←</button>
-    <div class="editor-divider"></div>
-    <div class="color-palette-wrap">
-      <button class="editor-btn color-palette-btn" onclick="togglePalette('modalFontPalette')" title="글자 색" style="gap:2px"><span id="modalFontColorSwatch" style="width:12px;height:12px;border-radius:2px;background:#1c2633;border:1px solid #ccc;display:inline-block"></span>A</button>
-      <div class="color-palette-popup" id="modalFontPalette">
-        <div class="cp-title">글자 색</div>
-        <div class="color-swatches" id="modalFontSwatches"></div>
-        <div class="color-custom-row"><label>직접 선택</label><input type="color" value="#1c2633" onchange="modalApplyDocColor('fore',this.value)"></div>
-      </div>
-    </div>
-    <div class="color-palette-wrap">
-      <button class="editor-btn color-palette-btn" onclick="togglePalette('modalBgPalette')" title="배경(형광펜) 색" style="gap:2px"><span id="modalBgColorSwatch" style="width:12px;height:12px;border-radius:2px;background:#ffff00;border:1px solid #ccc;display:inline-block"></span>🖍</button>
-      <div class="color-palette-popup" id="modalBgPalette">
-        <div class="cp-title">배경(형광펜) 색</div>
-        <div class="color-swatches" id="modalBgSwatches"></div>
-        <div class="color-custom-row"><label>직접 선택</label><input type="color" value="#ffff00" onchange="modalApplyDocColor('bg',this.value)"></div>
-      </div>
-    </div>
-    <div class="editor-divider"></div>
-    <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('removeFormat')" title="서식 제거" style="margin-left:auto">✕ 서식제거</button>
-  `;
-
-  // 표 편집 툴바 주입
-  const tableTb = document.createElement('div');
-  tableTb.id = 'modalTableToolbar';
-  tableTb.style.cssText = 'position:sticky;top:40px;z-index:19;';
-  tableTb.innerHTML = `
-    <span class="tbl-label">📊 표 편집</span>
-    <div class="editor-divider"></div>
-    <span class="tbl-label" style="font-weight:500">행:</span>
-    <button class="tbl-btn" onmousedown="event.preventDefault();docTableAddRow('above')">↑ 위 추가</button>
-    <button class="tbl-btn" onmousedown="event.preventDefault();docTableAddRow('below')">↓ 아래 추가</button>
-    <button class="tbl-btn danger" onmousedown="event.preventDefault();docTableDeleteRow()">✕ 행 삭제</button>
-    <div class="editor-divider"></div>
-    <span class="tbl-label" style="font-weight:500">열:</span>
-    <button class="tbl-btn" onmousedown="event.preventDefault();docTableAddCol('left')">← 왼쪽 추가</button>
-    <button class="tbl-btn" onmousedown="event.preventDefault();docTableAddCol('right')">→ 오른쪽 추가</button>
-    <button class="tbl-btn danger" onmousedown="event.preventDefault();docTableDeleteCol()">✕ 열 삭제</button>
-    <div class="editor-divider"></div>
-    <span class="tbl-label" style="font-weight:500">셀 합병:</span>
-    <button class="tbl-btn" id="modalMergeBtn" onmousedown="event.preventDefault()" onclick="mergeCells('doc')" disabled>⊞ 합치기</button>
-    <button class="tbl-btn" id="modalSplitBtn" onmousedown="event.preventDefault()" onclick="splitCell('doc')" disabled>⊟ 분리</button>
-    <div class="editor-divider"></div>
-    <span class="tbl-label" style="font-weight:500">셀 배경:</span>
-    <div class="tbl-bg-wrap">
-      <button class="tbl-btn" onmousedown="event.preventDefault()" onclick="toggleTblBgPalette('modalTblBgPalette')" style="display:flex;align-items:center;gap:4px;height:24px">
-        <span id="modalTblBgSwatch" style="width:13px;height:13px;border-radius:2px;background:#fff;border:1px solid #aaa;display:inline-block;flex-shrink:0"></span>배경색
-      </button>
-      <div class="tbl-bg-palette" id="modalTblBgPalette" onmousedown="event.preventDefault()">
-        <div class="cp-title">셀 배경색</div>
-        <div class="color-swatches" id="modalTblBgSwatches"></div>
-        <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
-          <label style="font-size:10px;color:var(--text-sub)">직접 선택</label>
-          <input type="color" value="#ffffff" onmousedown="event.stopPropagation()" onchange="modalTableSetBgColor(this.value)" style="width:36px;height:22px;border:none;cursor:pointer;padding:0">
-          <button class="tbl-btn danger" style="font-size:10px;padding:1px 6px;height:20px" onmousedown="event.preventDefault()" onclick="modalTableSetBgColor('')">초기화</button>
-        </div>
-      </div>
-    </div>
-  `;
-
-  // modalDocBody 맨 앞에 툴바 삽입 (overflow:hidden 컨테이너 밖에 위치시켜 팔레트 팝업이 잘리지 않게)
-  body.insertBefore(tableTb, body.firstElementChild);
-  body.insertBefore(toolbar, body.firstElementChild);
-
-  // 표 툴바 mousedown → 활성 셀 포커스 유지
-  tableTb.addEventListener('mousedown', e => e.preventDefault());
-
-  // 색상 팔레트 스와치 초기화
-  document.getElementById('modalFontSwatches').innerHTML = PALETTE_COLORS.map(c =>
-    `<div class="color-swatch" style="background:${c}" title="${c}" onclick="modalApplyDocColor('fore','${c}')"></div>`
-  ).join('');
-  document.getElementById('modalBgSwatches').innerHTML = PALETTE_COLORS.map(c =>
-    `<div class="color-swatch" style="background:${c}" title="${c}" onclick="modalApplyDocColor('bg','${c}')"></div>`
-  ).join('');
-  document.getElementById('modalTblBgSwatches').innerHTML = TABLE_BG_COLORS.map(c =>
-    `<div class="color-swatch" style="background:${c}" title="${c}" onmousedown="event.preventDefault()" onclick="modalTableSetBgColor('${c}')"></div>`
-  ).join('');
+  // 에디터 툴바 표시
+  document.getElementById('modalEditToolbar').style.display = '';
 
   contentEl.focus();
 
@@ -5531,7 +5512,10 @@ function enableInlineEdit(docId) {
   `;
 }
 
+
 function cancelInlineEdit(docId) {
+  const _mEdit = document.getElementById('modalEditToolbar');
+  if (_mEdit) _mEdit.style.display = 'none';
   _cleanupInlineEditHandlers();
   _inlineEditEl = null;
   viewDoc(docId);
@@ -7597,17 +7581,19 @@ const PALETTE_COLORS = [
 
 function initPalettes() {
   [
-    ['docFontSwatches', 'fore', 'doc'],
-    ['docBgSwatches',   'bg',   'doc'],
+    ['docFontSwatches',    'fore', 'doc'],
+    ['docBgSwatches',      'bg',   'doc'],
     ['noticeFontSwatches', 'fore', 'notice'],
     ['noticeBgSwatches',   'bg',   'notice'],
     ['tplFontSwatches',    'fore', 'tpl'],
+    ['modalFontSwatches',  'fore', 'modal'],
+    ['modalBgSwatches',    'bg',   'modal'],
   ].forEach(([id, type, editor])=>{
     const el = document.getElementById(id);
     if (!el) return;
     el.innerHTML = PALETTE_COLORS.map(c=>`
       <div class="color-swatch" style="background:${c}" title="${c}"
-           onclick="${editor==='doc'?`applyDocColor('${type}','${c}')`:editor==='tpl'?`applyTplColor('${type}','${c}')`:`applyNoticeColor('${type}','${c}')`}"></div>
+           onclick="${editor==='doc'?`applyDocColor('${type}','${c}')`:editor==='tpl'?`applyTplColor('${type}','${c}')`:editor==='modal'?`modalApplyDocColor('${type}','${c}')`:`applyNoticeColor('${type}','${c}')`}"></div>
     `).join('');
   });
 }
@@ -7645,12 +7631,12 @@ function tableSetBgColor(color, type) {
 }
 
 function initTblBgPalettes() {
-  [['docTblBgSwatches','doc'],['tplTblBgSwatches','tpl']].forEach(([id, type]) => {
+  [['docTblBgSwatches','doc'],['tplTblBgSwatches','tpl'],['modalTblBgSwatches','modal']].forEach(([id, type]) => {
     const el = document.getElementById(id);
     if (!el) return;
     el.innerHTML = TABLE_BG_COLORS.map(c =>
       `<div class="color-swatch" style="background:${c}" title="${c}"
-            onmousedown="event.preventDefault()" onclick="tableSetBgColor('${c}','${type}')"></div>`
+            onmousedown="event.preventDefault()" onclick="${type==='modal'?`modalTableSetBgColor('${c}')`:`tableSetBgColor('${c}','${type}')`}"></div>`
     ).join('');
   });
 }
@@ -8405,6 +8391,9 @@ window.addEventListener('DOMContentLoaded', ()=>{
   initTblBgPalettes();
   initDocEditorCheckbox();
   initTableEditing();
+  // 모달 표 툴바 mousedown → 활성 셀 포커스 유지
+  const _modalTb = document.getElementById('modalTableToolbar');
+  if (_modalTb) _modalTb.addEventListener('mousedown', e => e.preventDefault());
 });
 
 // ── 탭/창 활성화 시 즉시 동기화 (Chrome·Firefox·Edge·Safari 공통) ──────
@@ -8651,11 +8640,13 @@ function docUpdateTableToolbar() {
     if (docGetActiveCell()) tb.classList.add('visible');
     else tb.classList.remove('visible');
   }
-  // 모달 인라인 편집 표 툴바
+  // 모달 인라인 편집 표 툴바 - 인라인 편집 모드일 때만
   const modalTb = document.getElementById('modalTableToolbar');
-  if (modalTb) {
+  if (modalTb && _inlineEditEl) {
     if (docGetActiveCell()) modalTb.classList.add('visible');
     else modalTb.classList.remove('visible');
+  } else if (modalTb) {
+    modalTb.classList.remove('visible');
   }
 }
 
