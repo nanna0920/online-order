@@ -5484,9 +5484,7 @@ function printDoc(docId) {
     }
     table.style.width = '100%';
   });
-  // 인쇄 미리보기 기안자 서명 주입
   const printSigData = doc.writerSigData || (getUser(doc.writer) || {}).sigData;
-  if (printSigData) injectWriterSigDOM(tmp, printSigData);
   tmp.querySelectorAll('.form-sub').forEach(el => el.remove());
   const formTitle = tmp.querySelector('.form-title');
   // form-title이 있으면 그 텍스트, 없으면(커스텀 서식) doc.title 사용
