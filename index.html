@@ -411,7 +411,19 @@ canvas#sigCanvas { display:block; cursor:crosshair; touch-action:none; }
 .print-preview-toolbar h3 { color:#fff; font-size:15px; display:flex; align-items:center; gap:10px; }
 .print-preview-toolbar .toolbar-actions { display:flex; gap:10px; }
 .print-preview-body { flex:1; overflow-y:auto; background:#e8e8e8; padding:32px; display:flex; justify-content:center; }
-#printModalArea { background:#fff; width:210mm; min-height:297mm; box-shadow:0 4px 32px rgba(0,0,0,.3); padding:20mm 18mm; font-family:'Noto Sans KR',sans-serif; }
+#printModalArea { background:#fff; width:210mm; min-height:297mm; box-shadow:0 4px 32px rgba(0,0,0,.3); padding:16mm 18mm; font-family:'Noto Sans KR',sans-serif; }
+/* 프린트 미리보기 편집 모드 */
+#printEditToolbar { flex-shrink:0; display:none; }
+#printEditorToolbar { border-bottom:none; border-top:1.5px solid var(--border); }
+#printTableToolbar { display:none; flex-wrap:wrap; gap:3px; padding:4px 12px; background:#f0f6ff; border-bottom:1.5px solid #b3cce8; align-items:center; }
+#printTableToolbar.visible { display:flex; }
+#printTableToolbar .tbl-btn { font-size:11px;padding:2px 9px;height:24px;border:1.5px solid #b3cce8;border-radius:4px;background:#fff;cursor:pointer;white-space:nowrap;font-weight:600;color:var(--primary); }
+#printTableToolbar .tbl-btn:hover { background:var(--primary);color:#fff; }
+#printTableToolbar .tbl-btn.danger { color:#c0392b;border-color:#f5b7b1; }
+#printTableToolbar .tbl-btn.danger:hover { background:#c0392b;color:#fff; }
+#printTableToolbar .tbl-btn:disabled { opacity:0.38;cursor:not-allowed;pointer-events:none; }
+#printTableToolbar .tbl-label { font-size:11px;font-weight:700;color:var(--text-sub);margin-right:4px; }
+#printModalArea[contenteditable="true"] { outline:2px solid var(--primary) !important; border-radius:4px; }
 
 /* PRINT DOCUMENT LAYOUT */
 #printModalArea {
@@ -2284,9 +2296,95 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
 <div id="printPreviewModal">
   <div class="print-preview-toolbar print-no">
     <h3>&#128424; 프린트 미리보기 &nbsp;<span id="printDocTitle" style="font-weight:400;opacity:.75;font-size:13px"></span></h3>
-    <div class="toolbar-actions">
+    <div id="printToolbarNormalActions" class="toolbar-actions">
+      <button class="btn" style="background:#fff;color:var(--primary);border:1.5px solid #b3cce8;font-weight:600" onclick="enablePrintEdit()">&#9998; 수정</button>
       <button class="btn btn-accent" onclick="executePrint()">&#128424; 인쇄하기</button>
       <button class="btn btn-secondary" onclick="closePrintPreview()">&#10005; 닫기</button>
+    </div>
+    <div id="printToolbarEditActions" class="toolbar-actions" style="display:none">
+      <button class="btn btn-success" onclick="savePrintEdit()">&#128190; 저장</button>
+      <button class="btn btn-accent" onclick="executePrint()">&#128424; 인쇄하기</button>
+      <button class="btn btn-secondary" onclick="cancelPrintEdit()">&#10005; 수정취소</button>
+    </div>
+  </div>
+  <!-- 프린트 미리보기 편집 툴바 (수정 모드에서만 표시) -->
+  <div id="printEditToolbar" class="print-no">
+    <div id="printEditorToolbar" class="doc-editor-toolbar" style="border-bottom:none;border-top:1.5px solid var(--border)">
+      <select class="editor-select" onchange="docExecCmd('formatBlock',this.value);this.value=''" title="단락 스타일">
+        <option value="">단락</option><option value="h2">제목 1</option><option value="h3">제목 2</option><option value="h4">제목 3</option><option value="p">본문</option>
+      </select>
+      <select class="editor-select" onchange="docExecCmd('fontSize',this.value);this.value=''" title="글자 크기" style="width:64px">
+        <option value="">크기</option><option value="1">10px</option><option value="2">12px</option><option value="3">14px</option><option value="4">16px</option><option value="5">18px</option><option value="6">24px</option>
+      </select>
+      <div class="editor-divider"></div>
+      <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('bold')" title="굵게"><b>B</b></button>
+      <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('italic')" title="기울임"><i>I</i></button>
+      <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('underline')" title="밑줄"><u>U</u></button>
+      <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('strikeThrough')" title="취소선"><s>S</s></button>
+      <div class="editor-divider"></div>
+      <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('justifyLeft')" title="왼쪽 정렬">◀</button>
+      <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('justifyCenter')" title="가운데 정렬">▬</button>
+      <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('justifyRight')" title="오른쪽 정렬">▶</button>
+      <div class="editor-divider"></div>
+      <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('insertUnorderedList')" title="글머리 기호">• 목록</button>
+      <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('insertOrderedList')" title="번호 목록">1. 목록</button>
+      <div class="editor-divider"></div>
+      <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('indent')" title="들여쓰기">→</button>
+      <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('outdent')" title="내어쓰기">←</button>
+      <div class="editor-divider"></div>
+      <div class="color-palette-wrap">
+        <button class="editor-btn color-palette-btn" id="printFontColorBtn" onclick="togglePalette('printFontPalette')" title="글자 색" style="gap:2px"><span id="printFontColorSwatch" style="width:12px;height:12px;border-radius:2px;background:#1c2633;border:1px solid #ccc;display:inline-block"></span>A</button>
+        <div class="color-palette-popup" id="printFontPalette">
+          <div class="cp-title">글자 색</div>
+          <div class="color-swatches" id="printFontSwatches"></div>
+          <div class="color-custom-row"><label>직접 선택</label><input type="color" value="#1c2633" onchange="printApplyDocColor('fore',this.value)"></div>
+        </div>
+      </div>
+      <div class="color-palette-wrap">
+        <button class="editor-btn color-palette-btn" id="printBgColorBtn" onclick="togglePalette('printBgPalette')" title="배경(형광펜) 색" style="gap:2px"><span id="printBgColorSwatch" style="width:12px;height:12px;border-radius:2px;background:#ffff00;border:1px solid #ccc;display:inline-block"></span>🖍</button>
+        <div class="color-palette-popup" id="printBgPalette">
+          <div class="cp-title">배경(형광펜) 색</div>
+          <div class="color-swatches" id="printBgSwatches"></div>
+          <div class="color-custom-row"><label>직접 선택</label><input type="color" value="#ffff00" onchange="printApplyDocColor('bg',this.value)"></div>
+        </div>
+      </div>
+      <div class="editor-divider"></div>
+      <button class="editor-btn" onmousedown="event.preventDefault();docExecCmd('removeFormat')" title="서식 제거" style="margin-left:auto">✕ 서식제거</button>
+    </div>
+    <div id="printTableToolbar">
+      <span class="tbl-label">📊 표 편집</span>
+      <div class="editor-divider"></div>
+      <span class="tbl-label" style="font-weight:500">행:</span>
+      <button class="tbl-btn" onmousedown="event.preventDefault();docTableAddRow('above')">↑ 위 추가</button>
+      <button class="tbl-btn" onmousedown="event.preventDefault();docTableAddRow('below')">↓ 아래 추가</button>
+      <button class="tbl-btn danger" onmousedown="event.preventDefault();docTableDeleteRow()">✕ 행 삭제</button>
+      <div class="editor-divider"></div>
+      <span class="tbl-label" style="font-weight:500">열:</span>
+      <button class="tbl-btn" onmousedown="event.preventDefault();docTableAddCol('left')">← 왼쪽 추가</button>
+      <button class="tbl-btn" onmousedown="event.preventDefault();docTableAddCol('right')">→ 오른쪽 추가</button>
+      <button class="tbl-btn danger" onmousedown="event.preventDefault();docTableDeleteCol()">✕ 열 삭제</button>
+      <div class="editor-divider"></div>
+      <span class="tbl-label" style="font-weight:500">셀 합병:</span>
+      <button class="tbl-btn" id="printMergeBtn" onmousedown="event.preventDefault()" onclick="mergeCells('doc')" disabled>⊞ 합치기</button>
+      <button class="tbl-btn" id="printSplitBtn" onmousedown="event.preventDefault()" onclick="splitCell('doc')" disabled>⊟ 분리</button>
+      <div class="editor-divider"></div>
+      <span class="tbl-label" style="font-weight:500">셀 배경:</span>
+      <div class="tbl-bg-wrap">
+        <button class="tbl-btn" onmousedown="event.preventDefault()" onclick="toggleTblBgPalette('printTblBgPalette')" style="display:flex;align-items:center;gap:4px;height:24px">
+          <span id="printTblBgSwatch" style="width:13px;height:13px;border-radius:2px;background:#fff;border:1px solid #aaa;display:inline-block;flex-shrink:0"></span>배경색
+        </button>
+        <div class="tbl-bg-palette" id="printTblBgPalette" onmousedown="event.preventDefault()">
+          <div class="cp-title">셀 배경색</div>
+          <div class="color-swatches" id="printTblBgSwatches"></div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+            <label style="font-size:10px;color:var(--text-sub)">직접 선택</label>
+            <input type="color" value="#ffffff" onmousedown="event.stopPropagation()" onchange="printTableSetBgColor(this.value)" style="width:36px;height:22px;border:none;cursor:pointer;padding:0">
+            <button class="tbl-btn danger" style="font-size:10px;padding:1px 6px;height:20px" onmousedown="event.preventDefault()" onclick="printTableSetBgColor('')">초기화</button>
+          </div>
+        </div>
+      </div>
+      <div class="editor-divider"></div>
+      <span class="tbl-label" style="font-size:10px;color:var(--text-muted)">Tab: 다음 셀</span>
     </div>
   </div>
   <div class="print-preview-body">
@@ -5278,7 +5376,11 @@ function renderDocContent(htmlContent) {
 // ============================================================
 // PRINT DOC - 미리보기 모달
 // ============================================================
+let _printDocId = null;
+let _printOrigFormTitle = null;
+
 function printDoc(docId) {
+  _printDocId = docId;
   const doc = DB.docs.find(d=>d.id===docId);
   if (!doc) return;
   const writer = getUser(doc.writer);
@@ -5366,6 +5468,8 @@ function printDoc(docId) {
   const formTitle = tmp.querySelector('.form-title');
   // form-title이 있으면 그 텍스트, 없으면(커스텀 서식) doc.title 사용
   const titleText = formTitle ? formTitle.textContent.trim() : (doc.title || '');
+  // 편집 후 저장 시 form-title 복원을 위해 원본 저장
+  _printOrigFormTitle = formTitle ? formTitle.outerHTML : null;
   const drafterName = writer ? writer.name : '';
   const drafterSigHtml = printSigData
     ? `<img src="${printSigData}" style="width:calc(${COL_W} - 4px);height:${SIG_IMG_H};object-fit:contain;display:block;margin:0 auto;" alt="서명">`
@@ -5399,6 +5503,11 @@ function printDoc(docId) {
     // 커스텀 서식: form-title 없으므로 내용 맨 앞에 제목+결재행 테이블 삽입
     tmp.insertAdjacentHTML('afterbegin', combinedHtml);
   }
+  // 결재 헤더 테이블에 마킹 (편집 모드에서 수정 불가 처리)
+  const headerTable = tmp.firstElementChild;
+  if (headerTable && (headerTable.tagName === 'TABLE')) {
+    headerTable.setAttribute('data-print-header', '1');
+  }
   const renderedContent = tmp.innerHTML;
 
   const printHtml = `
@@ -5419,6 +5528,7 @@ function printDoc(docId) {
 
     const after = document.createElement('div');
     after.style.cssText = 'text-align:center;color:#000;line-height:1.8';
+    after.setAttribute('data-print-appended', '1');
     after.innerHTML = `
       <br><br><br>
       <span style="font-size:20px">${submitDateStr}</span>
@@ -5452,7 +5562,106 @@ function printDoc(docId) {
 }
 
 function closePrintPreview() {
+  _exitPrintEditMode();
   document.getElementById('printPreviewModal').classList.remove('open');
+}
+
+function _exitPrintEditMode() {
+  if (_inlineEditEl) {
+    const printArea = document.getElementById('printModalArea');
+    if (printArea && printArea.contains(_inlineEditEl)) {
+      if (_inlineEditEl._modalMoveHandler) document.removeEventListener('mousemove', _inlineEditEl._modalMoveHandler);
+      if (_inlineEditEl._modalUpHandler)   document.removeEventListener('mouseup',   _inlineEditEl._modalUpHandler);
+      _inlineEditEl = null;
+      _docActiveCell = null;
+    }
+  }
+  document.getElementById('printEditToolbar').style.display = 'none';
+  document.getElementById('printToolbarNormalActions').style.display = '';
+  document.getElementById('printToolbarEditActions').style.display = 'none';
+  const printTb = document.getElementById('printTableToolbar');
+  if (printTb) printTb.classList.remove('visible');
+}
+
+function enablePrintEdit() {
+  const bodyEl = document.querySelector('#printModalArea .pd-body-no-date');
+  if (!bodyEl) return;
+
+  // 결재 헤더 테이블 편집 불가 처리
+  bodyEl.querySelectorAll('[data-print-header]').forEach(el => {
+    el.setAttribute('contenteditable', 'false');
+  });
+  // "위와 같이" 첨부 블록 편집 불가 처리
+  bodyEl.querySelectorAll('[data-print-appended]').forEach(el => {
+    el.setAttribute('contenteditable', 'false');
+  });
+
+  bodyEl.contentEditable = 'true';
+  _inlineEditEl = bodyEl;
+
+  // form-chk 스팬 체크박스 클릭 활성화
+  bodyEl.querySelectorAll('.form-chk').forEach(el => {
+    el.style.pointerEvents = 'auto';
+    el.style.cursor = 'pointer';
+    el.onclick = function(e) { e.preventDefault(); e.stopPropagation(); toggleFormChk(this); };
+  });
+  bodyEl.querySelectorAll('input[type="checkbox"]').forEach(chk => {
+    chk.style.pointerEvents = 'auto';
+    chk.style.cursor = 'pointer';
+  });
+
+  // 표 편집 이벤트 연결
+  attachModalTableEditing(bodyEl);
+
+  // 편집 툴바 표시
+  document.getElementById('printEditToolbar').style.display = '';
+  document.getElementById('printToolbarNormalActions').style.display = 'none';
+  document.getElementById('printToolbarEditActions').style.display = 'flex';
+
+  bodyEl.focus();
+}
+
+async function savePrintEdit() {
+  const doc = DB.docs.find(d => d.id === _printDocId);
+  if (!doc) return;
+  const bodyEl = document.querySelector('#printModalArea .pd-body-no-date');
+  if (!bodyEl) return;
+
+  // 편집 내용 복제 후 프린트 전용 요소 제거
+  const clone = bodyEl.cloneNode(true);
+  clone.querySelectorAll('[data-print-header],[data-print-appended]').forEach(el => el.remove());
+  // form-title 원본 복원 (내장 서식)
+  if (_printOrigFormTitle) clone.insertAdjacentHTML('afterbegin', _printOrigFormTitle);
+
+  doc.content = serializeEditorHTML(clone);
+  _exitPrintEditMode();
+  await sbSave('docs', doc.id, doc);
+  showToast('문서가 수정되었습니다.', 'success');
+  loadApprovalBox();
+}
+
+function cancelPrintEdit() {
+  _exitPrintEditMode();
+  if (_printDocId) printDoc(_printDocId);
+}
+
+function printApplyDocColor(type, color) {
+  if (!_inlineEditEl) return;
+  _inlineEditEl.focus();
+  document.execCommand(type === 'fore' ? 'foreColor' : 'hiliteColor', false, color);
+  const swatch = document.getElementById(type === 'fore' ? 'printFontColorSwatch' : 'printBgColorSwatch');
+  if (swatch) swatch.style.background = color;
+  const palette = document.getElementById(type === 'fore' ? 'printFontPalette' : 'printBgPalette');
+  if (palette) palette.classList.remove('open');
+}
+
+function printTableSetBgColor(color) {
+  const cell = docGetActiveCell();
+  if (!cell) return;
+  cell.style.background = color || '';
+  const swatch = document.getElementById('printTblBgSwatch');
+  if (swatch) swatch.style.background = color || '#fff';
+  document.querySelectorAll('.tbl-bg-palette').forEach(p => p.classList.remove('open'));
 }
 
 function closeThenPrint(docId) {
@@ -5597,7 +5806,8 @@ function attachModalTableEditing(contentEl) {
       updateMergeBtns('doc');
     } else {
       const tb = document.getElementById('modalTableToolbar');
-      if (tb && tb.contains(e.target)) return;
+      const ptb = document.getElementById('printTableToolbar');
+      if ((tb && tb.contains(e.target)) || (ptb && ptb.contains(e.target))) return;
       _docActiveCell = null;
       clearMergeSel('doc');
       docUpdateTableToolbar();
@@ -7588,12 +7798,14 @@ function initPalettes() {
     ['tplFontSwatches',    'fore', 'tpl'],
     ['modalFontSwatches',  'fore', 'modal'],
     ['modalBgSwatches',    'bg',   'modal'],
+    ['printFontSwatches',  'fore', 'print'],
+    ['printBgSwatches',    'bg',   'print'],
   ].forEach(([id, type, editor])=>{
     const el = document.getElementById(id);
     if (!el) return;
     el.innerHTML = PALETTE_COLORS.map(c=>`
       <div class="color-swatch" style="background:${c}" title="${c}"
-           onclick="${editor==='doc'?`applyDocColor('${type}','${c}')`:editor==='tpl'?`applyTplColor('${type}','${c}')`:editor==='modal'?`modalApplyDocColor('${type}','${c}')`:`applyNoticeColor('${type}','${c}')`}"></div>
+           onclick="${editor==='doc'?`applyDocColor('${type}','${c}')`:editor==='tpl'?`applyTplColor('${type}','${c}')`:editor==='modal'?`modalApplyDocColor('${type}','${c}')`:editor==='print'?`printApplyDocColor('${type}','${c}')`:`applyNoticeColor('${type}','${c}')`}"></div>
     `).join('');
   });
 }
@@ -7631,12 +7843,12 @@ function tableSetBgColor(color, type) {
 }
 
 function initTblBgPalettes() {
-  [['docTblBgSwatches','doc'],['tplTblBgSwatches','tpl'],['modalTblBgSwatches','modal']].forEach(([id, type]) => {
+  [['docTblBgSwatches','doc'],['tplTblBgSwatches','tpl'],['modalTblBgSwatches','modal'],['printTblBgSwatches','print']].forEach(([id, type]) => {
     const el = document.getElementById(id);
     if (!el) return;
     el.innerHTML = TABLE_BG_COLORS.map(c =>
       `<div class="color-swatch" style="background:${c}" title="${c}"
-            onmousedown="event.preventDefault()" onclick="${type==='modal'?`modalTableSetBgColor('${c}')`:`tableSetBgColor('${c}','${type}')`}"></div>`
+            onmousedown="event.preventDefault()" onclick="${type==='modal'?`modalTableSetBgColor('${c}')`:type==='print'?`printTableSetBgColor('${c}')`:`tableSetBgColor('${c}','${type}')`}"></div>`
     ).join('');
   });
 }
@@ -8394,6 +8606,9 @@ window.addEventListener('DOMContentLoaded', ()=>{
   // 모달 표 툴바 mousedown → 활성 셀 포커스 유지
   const _modalTb = document.getElementById('modalTableToolbar');
   if (_modalTb) _modalTb.addEventListener('mousedown', e => e.preventDefault());
+  // 프린트 미리보기 표 툴바 mousedown → 활성 셀 포커스 유지
+  const _printTb = document.getElementById('printTableToolbar');
+  if (_printTb) _printTb.addEventListener('mousedown', e => e.preventDefault());
 });
 
 // ── 탭/창 활성화 시 즉시 동기화 (Chrome·Firefox·Edge·Safari 공통) ──────
@@ -8648,6 +8863,15 @@ function docUpdateTableToolbar() {
   } else if (modalTb) {
     modalTb.classList.remove('visible');
   }
+  // 프린트 미리보기 편집 표 툴바
+  const printTb = document.getElementById('printTableToolbar');
+  const printArea = document.getElementById('printModalArea');
+  if (printTb && _inlineEditEl && printArea && printArea.contains(_inlineEditEl)) {
+    if (docGetActiveCell()) printTb.classList.add('visible');
+    else printTb.classList.remove('visible');
+  } else if (printTb) {
+    printTb.classList.remove('visible');
+  }
 }
 
 function docFocusCell(cell) {
@@ -8810,6 +9034,10 @@ function updateMergeBtns(type) {
     const sb2 = document.getElementById('modalSplitBtn');
     if (mb2) mb2.disabled = s.cells.size < 2;
     if (sb2) sb2.disabled = !(active && (active.colSpan > 1 || active.rowSpan > 1));
+    const mb3 = document.getElementById('printMergeBtn');
+    const sb3 = document.getElementById('printSplitBtn');
+    if (mb3) mb3.disabled = s.cells.size < 2;
+    if (sb3) sb3.disabled = !(active && (active.colSpan > 1 || active.rowSpan > 1));
   }
 }
 
