@@ -5229,12 +5229,6 @@ function viewDoc(docId) {
   }
 
   openModal('docViewModal');
-  // 서명 주입: 신청자/성명 셀에 기안자 서명 표시
-  const sigData = doc.writerSigData || (getUser(doc.writer) || {}).sigData;
-  if (sigData) {
-    const contentEl = document.getElementById('modalDocBody').querySelector('.doc-view-content');
-    if (contentEl) injectWriterSigDOM(contentEl, sigData);
-  }
 }
 
 function quickProcessApproval(docId, action) {
