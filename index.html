@@ -2297,7 +2297,7 @@ input[type=file] { border:1.5px dashed var(--border); padding:10px; border-radiu
   <div class="print-preview-toolbar print-no">
     <h3>&#128424; 프린트 미리보기 &nbsp;<span id="printDocTitle" style="font-weight:400;opacity:.75;font-size:13px"></span></h3>
     <div id="printToolbarNormalActions" class="toolbar-actions">
-      <button class="btn" style="background:#fff;color:var(--primary);border:1.5px solid #b3cce8;font-weight:600" onclick="enablePrintEdit()">&#9998; 수정</button>
+      <button class="btn print-edit-btn" style="background:#fff;color:var(--primary);border:1.5px solid #b3cce8;font-weight:600" onclick="enablePrintEdit()">&#9998; 수정</button>
       <button class="btn btn-accent" onclick="executePrint()">&#128424; 인쇄하기</button>
       <button class="btn btn-secondary" onclick="closePrintPreview()">&#10005; 닫기</button>
     </div>
@@ -5556,6 +5556,10 @@ function printDoc(docId) {
   });
 
   document.getElementById('printDocTitle').textContent = '— ' + doc.title;
+  // 관리자만 수정 버튼 표시
+  const _isAdmin = !!(currentUser && (currentUser.role === 'admin' || currentUser.pos === '부원장'));
+  const _editBtn = document.querySelector('#printToolbarNormalActions .print-edit-btn');
+  if (_editBtn) _editBtn.style.display = _isAdmin ? '' : 'none';
   document.getElementById('printPreviewModal').classList.add('open');
 
 }
@@ -5583,6 +5587,9 @@ function _exitPrintEditMode() {
 }
 
 function enablePrintEdit() {
+  if (!(currentUser && (currentUser.role === 'admin' || currentUser.pos === '부원장'))) {
+    showToast('관리자만 문서를 수정할 수 있습니다.', 'warning'); return;
+  }
   const bodyEl = document.querySelector('#printModalArea .pd-body-no-date');
   if (!bodyEl) return;
 
