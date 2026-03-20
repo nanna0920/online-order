@@ -4968,7 +4968,7 @@ function renderMyDocs(filter) {
       <td>
         ${_readBadge}
         <button class="btn btn-sm btn-outline" onclick="viewDoc('${d.id}')">상세</button>
-        ${d.status==='approved'?`<button class="btn btn-sm btn-accent" style="background:#1a3a5c;color:#fff" onclick="printDoc('${d.id}')">🖨️ 출력</button>`:''}
+        <button class="btn btn-sm btn-accent" style="background:#1a3a5c;color:#fff" onclick="printDoc('${d.id}')">🖨️ 미리보기</button>
         ${d.status==='draft'&&!!(currentUser && (currentUser.role === 'admin' || currentUser.pos === '부원장'))?`<button class="btn btn-sm btn-primary" onclick="editDoc('${d.id}')">✏️ 수정</button>`:''}
         ${d.status==='draft'&&hasMenuPerm(currentUser,'myDocs','d')?`<button class="btn btn-sm btn-danger" onclick="deleteDoc('${d.id}')">삭제</button>`:''}
       </td>
@@ -5112,7 +5112,7 @@ function renderApprovalBox(filter) {
               : `<button class="btn btn-sm btn-outline" onclick="viewDoc('${d.id}')">상세보기</button>`)
           : `<button class="btn btn-sm btn-outline" onclick="viewDoc('${d.id}')">상세보기</button>`
         }
-        ${filter==='done'&&d.status==='approved'?`<button class="btn btn-sm btn-secondary" style="background:#1a3a5c;color:#fff" onclick="printDoc('${d.id}')">🖨️ 출력</button>`:''}
+        <button class="btn btn-sm btn-secondary" style="background:#1a3a5c;color:#fff" onclick="printDoc('${d.id}')">🖨️ 미리보기</button>
       </td>
     </tr>`;
   }).join('');
@@ -5188,16 +5188,15 @@ function viewDoc(docId) {
     footer.innerHTML = `
       <button class="btn btn-success" style="min-width:100px" onclick="processApproval('${doc.id}','approved')">✅ 결재</button>
       <button class="btn btn-danger"  style="min-width:100px" onclick="processApproval('${doc.id}','rejected')">❌ 반려</button>
+      <button class="btn btn-outline" onclick="closeThenPrint('${doc.id}')">🖨️ 미리보기</button>
       <button class="btn btn-secondary" onclick="closeModal('docViewModal')">닫기</button>
     `;
   } else {
-    const canPrint = doc.status === 'approved';
     const isAdmin = !!(currentUser && (currentUser.role === 'admin' || currentUser.pos === '부원장'));
-    const isWriter = doc.writer === currentUser.id;
     const canEditDelete = isAdmin;
     const _docAlreadyRead = _readDocIds.has(String(doc.id));
     footer.innerHTML = `
-      ${canPrint ? `<button class="btn btn-outline" onclick="closeThenPrint('${doc.id}')">🖨️ 출력</button>` : ''}
+      <button class="btn btn-outline" onclick="closeThenPrint('${doc.id}')">🖨️ 미리보기</button>
       ${canEditDelete ? `<button class="btn btn-primary" id="inlineEditBtn" onclick="enableInlineEdit('${doc.id}')">✏️ 수정</button>` : ''}
       ${canEditDelete ? `<button class="btn btn-danger"  onclick="deleteDocFromApproval('${doc.id}')">🗑️ 삭제</button>` : ''}
       ${!_docAlreadyRead ? `<button class="btn btn-primary" onclick="markDocRead('${doc.id}')">✅ 확인</button>` : ''}
