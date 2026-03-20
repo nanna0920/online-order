@@ -366,19 +366,46 @@ canvas#sigCanvas { display:block; cursor:crosshair; touch-action:none; }
 .org-member .info .pos { font-size:11px; color:var(--text-sub); }
 
 /* PRINT STYLES */
+@page {
+  size: A4;
+  margin: 16mm 18mm;
+}
 @media print {
-  body * { visibility:hidden !important; }
-  #printModalArea, #printModalArea * { visibility:visible !important; }
-  #printModalArea {
-    position:fixed !important; inset:0 !important;
-    background:#fff !important; z-index:99999 !important;
-    padding:16mm 18mm !important; margin:0 !important;
-    overflow:visible !important;
-    width:100% !important; box-shadow:none !important;
-    print-color-adjust:exact !important;
-    -webkit-print-color-adjust:exact !important;
+  /* visibility 대신 display:none 사용 → 레이아웃 공간 완전 제거로 중복 페이지/중복 출력 방지 */
+  body > *:not(#printPreviewModal) { display: none !important; }
+  #printPreviewModal {
+    display: block !important;
+    position: static !important;
+    background: none !important;
+    opacity: 1 !important;
+    overflow: visible !important;
   }
-  .print-no { display:none !important; }
+  .print-preview-toolbar,
+  #printEditToolbar,
+  .print-no { display: none !important; }
+  .print-preview-body {
+    display: block !important;
+    padding: 0 !important;
+    background: none !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+  /* @page 마진(16mm 18mm)이 여백을 담당하므로 padding:0, position:static */
+  #printModalArea {
+    position: static !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    min-height: 265mm !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    color: #000 !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+  #printModalArea .pd-body-no-date { flex:1 !important; display:flex !important; flex-direction:column !important; }
   /* 테이블 테두리 강제 출력 */
   #printModalArea table { border-collapse:collapse !important; }
   #printModalArea table td,
@@ -390,9 +417,6 @@ canvas#sigCanvas { display:block; cursor:crosshair; touch-action:none; }
   #printModalArea table th[style*="background:#000"] { color:#fff !important; print-color-adjust:exact; -webkit-print-color-adjust:exact; }
   #printModalArea .pd-body-no-date .form-sub { display:none !important; }
   #printModalArea hr { display:block !important; }
-  /* 인쇄 시에도 구조 유지 */
-  #printModalArea { display:flex !important; flex-direction:column !important; }
-  #printModalArea .pd-body-no-date { flex:1 !important; display:flex !important; flex-direction:column !important; }
   #printModalArea .pd-body-no-date .form-table { font-size:15px !important; }
   #printModalArea .pd-body-no-date .form-table tr:last-child td { border-bottom:1px solid #000 !important; vertical-align:top !important; }
   /* 셀 포커스/선택 아웃라인 인쇄 시 제거 */
